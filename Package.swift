@@ -13,7 +13,8 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/launchpad"
+            path: "Sources/launchpad",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
     ]
 )

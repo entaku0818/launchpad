@@ -8,26 +8,40 @@ struct IOSUploadCommand: ParsableCommand {
     )
 
     @Option(name: .long, help: "Path to .ipa file")
-    var ipa: String
+    var ipa: String?
 
-    @Flag(name: .long, help: "Upload to TestFlight (default: App Store)")
-    var testflight: Bool = false
+    @Option(name: .long, help: "Scheme name (used to locate IPA in build output) [config: ios.scheme]")
+    var scheme: String?
 
     mutating func run() throws {
-        let creds = try ASCCredentials.fromEnvironment()
-        let keyPath = try creds.writeKeyFile()
+        DotEnv.load()
+        let cfg = Config.load().ios
 
-        print("Uploading \(ipa)...")
+        let sch = scheme ?? cfg?.scheme
+        let ipaPath: String
+        if let ipa {
+            ipaPath = ipa
+        } else if let sch {
+            let out = cfg?.output ?? "./build"
+            ipaPath = "\(out)/export/\(sch).ipa"
+        } else {
+            Logger.error("--ipa or ios.scheme in .launchpadrc required")
+            Foundation.exit(1)
+        }
+
+        let creds = try ASCCredentials.fromEnvironment()
+        _ = try creds.writeKeyFile()
+
+        Logger.step("Uploading \(ipaPath)")
         try Shell.runLive([
             "xcrun", "altool",
             "--upload-app",
-            "-f", ipa,
+            "-f", ipaPath,
             "--apiKey", creds.keyID,
             "--apiIssuer", creds.issuerID,
             "--type", "ios",
         ])
 
-        print("Upload complete.")
-        _ = keyPath
+        Logger.success("Upload complete.")
     }
 }

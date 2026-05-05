@@ -7,8 +7,8 @@ struct AndroidUploadCommand: AsyncParsableCommand {
         abstract: "Upload AAB to Google Play"
     )
 
-    @Option(name: .long, help: "Package name (e.g. com.example.app)")
-    var packageName: String
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
 
     @Option(name: .long, help: "Track (internal, alpha, beta, production)")
     var track: String = "internal"
@@ -20,19 +20,24 @@ struct AndroidUploadCommand: AsyncParsableCommand {
     var metadataOnly: Bool = false
 
     mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName in .launchpadrc required"); Foundation.exit(1) }()
+
         let client = try GooglePlayClient.fromEnvironment()
 
         if metadataOnly {
-            print("Uploading metadata to Google Play (\(track))...")
-            try await client.uploadMetadata(packageName: packageName, track: track)
+            Logger.step("Uploading metadata to Google Play (\(track))")
+            try await client.uploadMetadata(packageName: pkg, track: track)
         } else {
             guard let aabPath = aab else {
-                throw LaunchpadError.fileNotFound("--aab is required")
+                Logger.error("--aab is required")
+                Foundation.exit(1)
             }
-            print("Uploading \(aabPath) to Google Play (\(track))...")
-            try await client.uploadAAB(packageName: packageName, aabPath: aabPath, track: track)
+            Logger.step("Uploading \(aabPath) to Google Play (\(track))")
+            try await client.uploadAAB(packageName: pkg, aabPath: aabPath, track: track)
         }
 
-        print("Upload complete.")
+        Logger.success("Upload complete.")
     }
 }
