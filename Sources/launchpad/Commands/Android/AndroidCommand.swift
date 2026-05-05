@@ -20,6 +20,9 @@ struct AndroidCommand: ParsableCommand {
             AndroidTestersCommand.self,
             AndroidCountriesCommand.self,
             AndroidDataSafetyCommand.self,
+            AndroidImagesCommand.self,
+            AndroidOffersCommand.self,
+            AndroidRefundsCommand.self,
         ]
     )
 }

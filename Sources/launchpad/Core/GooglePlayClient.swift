@@ -275,6 +275,83 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Store Images
+
+    func listImages(packageName: String, language: String, imageType: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(language)/images/\(imageType)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["images"] as? [[String: Any]] ?? []
+    }
+
+    func uploadImage(packageName: String, language: String, imageType: String, imagePath: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/\(packageName)/edits/\(editID)/listings/\(language)/images/\(imageType)?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("image/png", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: imagePath))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    // MARK: - Subscription Offers
+
+    func listSubscriptionOffers(packageName: String, productID: String, basePlanID: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["offers"] as? [[String: Any]] ?? []
+    }
+
+    func activateOffer(packageName: String, productID: String, basePlanID: String, offerID: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers/\(offerID):activate")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    // MARK: - Voided Purchases (Refunds)
+
+    func listVoidedPurchases(packageName: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/purchases/voidedpurchases?maxResults=\(limit)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["voidedPurchases"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Data Safety
 
     func getDataSafety(packageName: String) async throws -> [String: Any] {
