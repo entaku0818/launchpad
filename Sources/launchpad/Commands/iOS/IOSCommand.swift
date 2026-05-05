@@ -16,6 +16,8 @@ struct IOSCommand: ParsableCommand {
             IOSPricingCommand.self,
             IOSProductPagesCommand.self,
             IOSProvisioningCommand.self,
+            IOSSubscriptionGroupsCommand.self,
+            IOSPromoCodesCommand.self,
             IOSAnalyticsCommand.self,
             IOSFinanceCommand.self,
             IOSWebhooksCommand.self,

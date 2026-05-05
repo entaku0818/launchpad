@@ -380,6 +380,44 @@ struct ASCAPIClient {
         try await delete("/customerReviewResponses/\(responseID)")
     }
 
+    // MARK: - Subscription Groups
+
+    func getSubscriptionGroups(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptionGroups?filter[app]=\(appID)&fields[subscriptionGroups]=referenceName")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getSubscriptions(groupID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptionGroups/\(groupID)/subscriptions?fields[subscriptions]=productID,name,state,subscriptionPeriod,reviewNote")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Promo Codes
+
+    func getPromoCodeOffers(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/appStoreVersions?filter[appStoreState]=READY_FOR_SALE&fields[appStoreVersions]=versionString")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createPromoCodes(appID: String, quantity: Int) async throws -> [[String: Any]] {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPromotionalOfferCodes",
+                "attributes": ["numberOfCodes": quantity],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appPromoCodes", body: body)
+        return (response["data"] as? [[String: Any]]) ?? []
+    }
+
+    func listPromoCodes(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/promoCodes?limit=20")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Analytics Reports
 
     func requestAnalyticsReport(appID: String, reportType: String, frequency: String) async throws -> String {
