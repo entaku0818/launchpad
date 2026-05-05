@@ -352,6 +352,59 @@ struct GooglePlayClient {
         return json["voidedPurchases"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Managed Publishing
+
+    func getManagedPublishing(packageName: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/managedPublishing")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func setManagedPublishing(packageName: String, enabled: Bool) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/managedPublishing")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["isAutoPublishEnabled": !enabled])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func publishEdit(packageName: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    // MARK: - Bundles (uploaded builds)
+
+    func listBundles(packageName: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/bundles")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["bundles"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Data Safety
 
     func getDataSafety(packageName: String) async throws -> [String: Any] {
