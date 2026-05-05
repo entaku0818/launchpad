@@ -380,6 +380,79 @@ struct ASCAPIClient {
         try await delete("/customerReviewResponses/\(responseID)")
     }
 
+    // MARK: - Analytics Reports
+
+    func requestAnalyticsReport(appID: String, reportType: String, frequency: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "analyticsReportRequests",
+                "attributes": ["accessType": "ONGOING"],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ],
+            ]
+        ]
+        let response = try await post("/analyticsReportRequests", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    func getAnalyticsReports(requestID: String) async throws -> [[String: Any]] {
+        let data = try await get("/analyticsReportRequests/\(requestID)/reports")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getAnalyticsReportInstances(reportID: String) async throws -> [[String: Any]] {
+        let data = try await get("/analyticsReports/\(reportID)/instances")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getAnalyticsReportSegments(instanceID: String) async throws -> [[String: Any]] {
+        let data = try await get("/analyticsReportInstances/\(instanceID)/segments")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Finance Reports
+
+    func downloadFinanceReport(vendorNumber: String, reportDate: String, regionCode: String = "ZZ") async throws -> String {
+        let path = "/financeReports?filter[regionCode]=\(regionCode)&filter[reportDate]=\(reportDate)&filter[reportType]=FINANCIAL_REPORT&filter[vendorNumber]=\(vendorNumber)"
+        let url = URL(string: baseURL + path)!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(try credentials.generateJWT())", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response, data)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    // MARK: - Webhooks
+
+    func listWebhooks() async throws -> [[String: Any]] {
+        let data = try await get("/webhooks")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createWebhook(name: String, url: String, secret: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "webhooks",
+                "attributes": ["name": name, "endpoint": url, "secret": secret, "isEnabled": true],
+            ]
+        ]
+        let response = try await post("/webhooks", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    func deleteWebhook(id: String) async throws {
+        try await delete("/webhooks/\(id)")
+    }
+
     // MARK: - Review Submissions
 
     func getReviewSubmissions(appID: String) async throws -> [[String: Any]] {
