@@ -456,6 +456,18 @@ struct ASCAPIClient {
         return data["data"] as? [String: Any] ?? [:]
     }
 
+    // MARK: - App Clips
+
+    func getAppClips(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/appClips?fields[appClips]=bundleId")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getAppClipExperiences(appClipID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appClips/\(appClipID)/appClipDefaultExperiences?fields[appClipDefaultExperiences]=action,isPoweredBy")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - App Categories
 
     func getAppInfo(appID: String) async throws -> [String: Any] {

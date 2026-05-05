@@ -21,6 +21,7 @@ struct IOSCommand: ParsableCommand {
             IOSSandboxTestersCommand.self,
             IOSAgeRatingCommand.self,
             IOSCategoriesCommand.self,
+            IOSClipsCommand.self,
             IOSSubscriptionGroupsCommand.self,
             IOSPromoCodesCommand.self,
             IOSAnalyticsCommand.self,

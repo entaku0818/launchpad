@@ -352,6 +352,41 @@ struct GooglePlayClient {
         return json["voidedPurchases"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Expansion Files (OBB)
+
+    func getExpansionFile(packageName: String, versionCode: Int, fileType: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/expansionFiles/\(fileType)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func uploadExpansionFile(packageName: String, versionCode: Int, fileType: String, filePath: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/expansionFiles/\(fileType)?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: filePath))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
     // MARK: - Managed Publishing
 
     func getManagedPublishing(packageName: String) async throws -> [String: Any] {
