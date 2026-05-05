@@ -8,6 +8,8 @@ struct IOSCommand: ParsableCommand {
             IOSBuildCommand.self,
             IOSUploadCommand.self,
             IOSSubmitCommand.self,
+            IOSMetadataCommand.self,
+            IOSScreenshotsCommand.self,
         ]
     )
 }

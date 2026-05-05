@@ -46,9 +46,72 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
-    func uploadMetadata(packageName: String, track: String) async throws {
-        // Metadata-only: not yet implemented (requires local metadata directory)
-        print("Note: metadata-only upload via API not yet implemented.")
+    func uploadMetadata(packageName: String, track: String, metadataPath: String = "fastlane/metadata/android") async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let fm = FileManager.default
+        let localeDirs = (try? fm.contentsOfDirectory(atPath: metadataPath)) ?? []
+
+        for locale in localeDirs {
+            let localeDir = "\(metadataPath)/\(locale)"
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: localeDir, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            let gpLocale = locale.replacingOccurrences(of: "-", with: "_")
+            var listing: [String: String] = [:]
+
+            let fields: [(file: String, key: String)] = [
+                ("title.txt",            "title"),
+                ("short_description.txt","shortDescription"),
+                ("full_description.txt", "fullDescription"),
+                ("changelogs/default.txt","recentChanges"),
+            ]
+            for (file, key) in fields {
+                let path = "\(localeDir)/\(file)"
+                if let text = try? String(contentsOfFile: path, encoding: .utf8) {
+                    listing[key] = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+
+            guard !listing.isEmpty else { continue }
+
+            let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(gpLocale)")!
+            var req = URLRequest(url: url)
+            req.httpMethod = "PATCH"
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONSerialization.data(withJSONObject: listing)
+            _ = try await URLSession.shared.data(for: req)
+            Logger.success("Updated metadata for \(locale)")
+        }
+
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    func promoteTrack(packageName: String, from: String, to: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        // Get current releases from source track
+        let srcURL = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(from)")!
+        var srcReq = URLRequest(url: srcURL)
+        srcReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (srcData, _) = try await URLSession.shared.data(for: srcReq)
+        guard
+            let srcJSON = try JSONSerialization.jsonObject(with: srcData) as? [String: Any],
+            let releases = srcJSON["releases"] as? [[String: Any]],
+            let versionCodes = releases.first?["versionCodes"] as? [Int]
+        else { throw LaunchpadError.invalidResponse }
+
+        try await updateTrack(
+            packageName: packageName,
+            editID: editID,
+            track: to,
+            versionCode: versionCodes.last ?? 0,
+            token: token
+        )
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
     // MARK: - OAuth2

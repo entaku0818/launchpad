@@ -7,6 +7,7 @@ struct AndroidCommand: ParsableCommand {
         subcommands: [
             AndroidBuildCommand.self,
             AndroidUploadCommand.self,
+            AndroidPromoteCommand.self,
         ]
     )
 }
