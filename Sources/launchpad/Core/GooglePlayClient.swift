@@ -275,6 +275,22 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Deobfuscation (ProGuard mapping)
+
+    func uploadMapping(packageName: String, versionCode: Int, mappingPath: String, fileType: String = "proguard") async throws {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/\(packageName)/deobfuscationfiles/\(versionCode)/\(fileType)?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: mappingPath))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     // MARK: - Track management
 
     func promoteTrack(packageName: String, from: String, to: String) async throws {
