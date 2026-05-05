@@ -359,8 +359,25 @@ struct ASCAPIClient {
     // MARK: - Customer Reviews
 
     func getCustomerReviews(appID: String, limit: Int = 20) async throws -> [[String: Any]] {
-        let data = try await get("/apps/\(appID)/customerReviews?sort=-createdDate&limit=\(limit)")
+        let data = try await get("/apps/\(appID)/customerReviews?sort=-createdDate&limit=\(limit)&include=response")
         return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func replyToReview(reviewID: String, body: String) async throws {
+        let requestBody: [String: Any] = [
+            "data": [
+                "type": "customerReviewResponses",
+                "attributes": ["responseBody": body],
+                "relationships": [
+                    "review": ["data": ["type": "customerReviews", "id": reviewID]]
+                ],
+            ]
+        ]
+        _ = try await post("/customerReviewResponses", body: requestBody)
+    }
+
+    func deleteReviewResponse(responseID: String) async throws {
+        try await delete("/customerReviewResponses/\(responseID)")
     }
 
     // MARK: - Review Submissions
