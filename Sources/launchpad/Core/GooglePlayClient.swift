@@ -275,6 +275,56 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Users & Grants
+
+    func listUsers() async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/users")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["users"] as? [[String: Any]] ?? []
+    }
+
+    func grantUser(email: String, packageName: String, role: String) async throws {
+        let token = try await accessToken()
+        let developerAccount = (serviceAccountJSON["client_email"] as? String)?
+            .components(separatedBy: "@").last?
+            .components(separatedBy: ".").first ?? "me"
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/grants")!
+        let body: [String: Any] = [
+            "name": "developers/\(developerAccount)/users/\(email)/grants",
+            "packageName": packageName,
+            "appLevelPermissions": [role],
+        ]
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    // MARK: - Device Tier Configurations
+
+    func listDeviceTierConfigs(packageName: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/deviceTierConfigs")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["deviceTierConfigs"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Deobfuscation (ProGuard mapping)
 
     func uploadMapping(packageName: String, versionCode: Int, mappingPath: String, fileType: String = "proguard") async throws {
