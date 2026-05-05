@@ -89,6 +89,98 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
+    func setRollout(packageName: String, track: String, percentage: Double) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let srcURL = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(track)")!
+        var srcReq = URLRequest(url: srcURL)
+        srcReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (srcData, _) = try await URLSession.shared.data(for: srcReq)
+        guard
+            let srcJSON = try JSONSerialization.jsonObject(with: srcData) as? [String: Any],
+            let releases = srcJSON["releases"] as? [[String: Any]],
+            let existingRelease = releases.first,
+            let versionCodes = existingRelease["versionCodes"] as? [Int]
+        else { throw LaunchpadError.invalidResponse }
+
+        let fraction = min(max(percentage / 100.0, 0.0), 1.0)
+        var release: [String: Any] = [
+            "status": fraction >= 1.0 ? "completed" : "inProgress",
+            "versionCodes": versionCodes,
+        ]
+        if fraction < 1.0 { release["userFraction"] = fraction }
+        let body: [String: Any] = ["track": track, "releases": [release]]
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(track)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        _ = try await URLSession.shared.data(for: req)
+
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    func listReviews(packageName: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/reviews?maxResults=\(limit)&translationLanguage=ja")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["reviews"] as? [[String: Any]] ?? []
+    }
+
+    func replyToReview(packageName: String, reviewID: String, text: String) async throws {
+        let token = try await accessToken()
+        let encoded = reviewID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? reviewID
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/reviews/\(encoded):reply")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["replyText": text])
+        _ = try await URLSession.shared.data(for: req)
+    }
+
+    func shareInternally(packageName: String, aabPath: String) async throws -> String {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/\(packageName)/internalappsharingartifacts?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: aabPath))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let downloadURL = json["downloadUrl"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return downloadURL
+    }
+
+    func createRecovery(packageName: String, versionCode: Int) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/appRecoveries")!
+        let body: [String: Any] = [
+            "targeting": ["allUsers": [:]],
+            "remediations": [["type": "CANCEL_APP_UPGRADE", "versionCodeTargeting": ["versionCodes": [versionCode]]]],
+        ]
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw LaunchpadError.apiError(http.statusCode, body)
+        }
+    }
+
     func promoteTrack(packageName: String, from: String, to: String) async throws {
         let token = try await accessToken()
         let editID = try await createEdit(packageName: packageName, token: token)

@@ -10,6 +10,10 @@ struct IOSCommand: ParsableCommand {
             IOSSubmitCommand.self,
             IOSMetadataCommand.self,
             IOSScreenshotsCommand.self,
+            IOSPhasedReleaseCommand.self,
+            IOSReviewsCommand.self,
+            IOSScheduleCommand.self,
+            IOSReviewStatusCommand.self,
         ]
     )
 }

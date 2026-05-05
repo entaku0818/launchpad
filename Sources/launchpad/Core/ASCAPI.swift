@@ -11,7 +11,7 @@ struct ASCAPIClient {
     // MARK: - Apps
 
     func findApp(bundleID: String) async throws -> String {
-        let data = try await get("/apps?filter[bundleId]=\(bundleID)&fields[apps]=id,name")
+        let data = try await get("/apps?filter[bundleId]=\(bundleID)&fields[apps]=bundleId,name")
         guard
             let apps = data["data"] as? [[String: Any]],
             let id = apps.first?["id"] as? String
@@ -23,10 +23,19 @@ struct ASCAPIClient {
 
     // MARK: - App Store Versions
 
+    private static let editableStates = [
+        "PREPARE_FOR_SUBMISSION",
+        "DEVELOPER_REJECTED",
+        "REJECTED",
+        "METADATA_REJECTED",
+        "WAITING_FOR_REVIEW",
+        "IN_REVIEW",
+    ].joined(separator: ",")
+
     func getAppStoreVersion(appID: String, version: String) async throws -> String {
         let encoded = version.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? version
         let data = try await get(
-            "/apps/\(appID)/appStoreVersions?filter[platform]=IOS&filter[versionString]=\(encoded)&filter[appStoreState]=PREPARE_FOR_SUBMISSION"
+            "/apps/\(appID)/appStoreVersions?filter[platform]=IOS&filter[versionString]=\(encoded)&filter[appStoreState]=\(Self.editableStates)"
         )
         guard
             let versions = data["data"] as? [[String: Any]],
@@ -35,6 +44,22 @@ struct ASCAPIClient {
             throw LaunchpadError.versionNotFound(version)
         }
         return id
+    }
+
+    func getLatestEditableAppStoreVersion(appID: String) async throws -> (id: String, version: String) {
+        let data = try await get(
+            "/apps/\(appID)/appStoreVersions?filter[platform]=IOS&filter[appStoreState]=\(Self.editableStates)&limit=1"
+        )
+        guard
+            let versions = data["data"] as? [[String: Any]],
+            let first = versions.first,
+            let id = first["id"] as? String,
+            let attrs = first["attributes"] as? [String: Any],
+            let versionString = attrs["versionString"] as? String
+        else {
+            throw LaunchpadError.versionNotFound("(no editable version)")
+        }
+        return (id, versionString)
     }
 
     // MARK: - Localizations (metadata)
@@ -106,6 +131,85 @@ struct ASCAPIClient {
             ]
         ]
         _ = try await patch("/appScreenshots/\(id)", body: body)
+    }
+
+    // MARK: - Phased Release
+
+    func getPhasedRelease(versionID: String) async throws -> (id: String, state: String)? {
+        let data = try await get("/appStoreVersions/\(versionID)/appStoreVersionPhasedRelease")
+        guard
+            let d = data["data"] as? [String: Any],
+            let id = d["id"] as? String,
+            let attrs = d["attributes"] as? [String: Any],
+            let state = attrs["phasedReleaseState"] as? String
+        else { return nil }
+        return (id, state)
+    }
+
+    func createPhasedRelease(versionID: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionPhasedReleases",
+                "attributes": ["phasedReleaseState": "INACTIVE"],
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appStoreVersionPhasedReleases", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    func updatePhasedRelease(id: String, state: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionPhasedReleases",
+                "id": id,
+                "attributes": ["phasedReleaseState": state],
+            ]
+        ]
+        _ = try await patch("/appStoreVersionPhasedReleases/\(id)", body: body)
+    }
+
+    func deletePhasedRelease(id: String) async throws {
+        try await delete("/appStoreVersionPhasedReleases/\(id)")
+    }
+
+    // MARK: - Schedule Release
+
+    func scheduleRelease(versionID: String, date: String?) async throws {
+        var attributes: [String: Any]
+        if let date {
+            attributes = ["releaseType": "SCHEDULED", "earliestReleaseDate": date]
+        } else {
+            attributes = ["releaseType": "AFTER_APPROVAL"]
+        }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersions",
+                "id": versionID,
+                "attributes": attributes,
+            ]
+        ]
+        _ = try await patch("/appStoreVersions/\(versionID)", body: body)
+    }
+
+    // MARK: - Customer Reviews
+
+    func getCustomerReviews(appID: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/customerReviews?sort=-createdDate&limit=\(limit)")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Review Submissions
+
+    func getReviewSubmissions(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/reviewSubmissions?filter[platform]=IOS&limit=10")
+        return data["data"] as? [[String: Any]] ?? []
     }
 
     // MARK: - Submit for Review

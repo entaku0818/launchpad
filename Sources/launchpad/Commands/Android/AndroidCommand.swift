@@ -8,6 +8,10 @@ struct AndroidCommand: ParsableCommand {
             AndroidBuildCommand.self,
             AndroidUploadCommand.self,
             AndroidPromoteCommand.self,
+            AndroidRolloutCommand.self,
+            AndroidReviewsCommand.self,
+            AndroidShareCommand.self,
+            AndroidRecoverCommand.self,
         ]
     )
 }
