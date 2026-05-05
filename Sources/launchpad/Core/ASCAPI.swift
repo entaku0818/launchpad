@@ -380,6 +380,90 @@ struct ASCAPIClient {
         try await delete("/customerReviewResponses/\(responseID)")
     }
 
+    // MARK: - App Store Versions (management)
+
+    func createAppStoreVersion(appID: String, versionString: String, platform: String = "IOS") async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersions",
+                "attributes": ["versionString": versionString, "platform": platform],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appStoreVersions", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    func listAppStoreVersions(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/appStoreVersions?fields[appStoreVersions]=versionString,appStoreState,platform,createdDate&limit=10&sort=-createdDate")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Builds (TestFlight)
+
+    func listBuilds(appID: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let data = try await get("/builds?filter[app]=\(appID)&fields[builds]=version,uploadedDate,processingState,minOsVersion,iconAssetToken&sort=-uploadedDate&limit=\(limit)&include=preReleaseVersion")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getBuild(buildID: String) async throws -> [String: Any] {
+        let data = try await get("/builds/\(buildID)?include=preReleaseVersion,betaGroups")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    // MARK: - Sandbox Testers
+
+    func listSandboxTesters() async throws -> [[String: Any]] {
+        let data = try await get("/sandboxTesters?fields[sandboxTesters]=firstName,lastName,appleId,territory,subscriptionRenewalRate")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSandboxTester(firstName: String, lastName: String, email: String, password: String, territory: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "sandboxTesters",
+                "attributes": [
+                    "firstName": firstName,
+                    "lastName": lastName,
+                    "appleId": email,
+                    "password": password,
+                    "territory": territory,
+                ],
+            ]
+        ]
+        let response = try await post("/sandboxTesters", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    func deleteSandboxTester(id: String) async throws {
+        try await delete("/sandboxTesters/\(id)")
+    }
+
+    // MARK: - Age Rating
+
+    func getAgeRatingDeclaration(versionID: String) async throws -> [String: Any] {
+        let data = try await get("/appStoreVersions/\(versionID)/ageRatingDeclaration")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    // MARK: - App Categories
+
+    func getAppInfo(appID: String) async throws -> [String: Any] {
+        let data = try await get("/apps/\(appID)/appInfos?include=primaryCategory,secondaryCategory&limit=1")
+        guard let infos = data["data"] as? [[String: Any]] else { throw LaunchpadError.invalidResponse }
+        return infos.first ?? [:]
+    }
+
     // MARK: - Subscription Groups
 
     func getSubscriptionGroups(appID: String) async throws -> [[String: Any]] {
