@@ -275,6 +275,20 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Data Safety
+
+    func getDataSafety(packageName: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/dataSafety")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
     // MARK: - Testers (alpha/beta tracks)
 
     func getTesters(packageName: String, track: String) async throws -> [String] {
