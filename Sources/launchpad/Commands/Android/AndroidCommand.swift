@@ -13,6 +13,7 @@ struct AndroidCommand: ParsableCommand {
             AndroidShareCommand.self,
             AndroidRecoverCommand.self,
             AndroidSubscriptionsCommand.self,
+            AndroidIAPCommand.self,
         ]
     )
 }
