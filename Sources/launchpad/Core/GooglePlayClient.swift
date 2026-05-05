@@ -275,6 +275,77 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Testers (alpha/beta tracks)
+
+    func getTesters(packageName: String, track: String) async throws -> [String] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/testers/\(track)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        // discard edit - read-only
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["testers"] as? [String] ?? []
+    }
+
+    func setTesters(packageName: String, track: String, emails: [String]) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/testers/\(track)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["testers": emails])
+        _ = try await URLSession.shared.data(for: req)
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    // MARK: - Country Availability
+
+    func getCountryAvailability(packageName: String, track: String) async throws -> (countries: [String], restOfWorld: Bool) {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/countryavailability/\(track)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        let countries = (json["countries"] as? [[String: Any]])?.compactMap { $0["countryCode"] as? String } ?? []
+        let restOfWorld = json["includeRestOfWorld"] as? Bool ?? false
+        return (countries, restOfWorld)
+    }
+
+    func setCountryAvailability(packageName: String, track: String, countries: [String], restOfWorld: Bool) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let body: [String: Any] = [
+            "countries": countries.map { ["countryCode": $0] },
+            "includeRestOfWorld": restOfWorld,
+        ]
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/countryavailability/\(track)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        _ = try await URLSession.shared.data(for: req)
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
     // MARK: - Users & Grants
 
     func listUsers() async throws -> [[String: Any]] {
