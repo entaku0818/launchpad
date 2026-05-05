@@ -175,6 +175,102 @@ struct ASCAPIClient {
         _ = try await delete("/betaGroups/\(groupID)/relationships/betaTesters", body: body)
     }
 
+    // MARK: - App Preview Videos
+
+    func getPreviewSets(localizationID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appStoreVersionLocalizations/\(localizationID)/appPreviewSets")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getPreviews(setID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appPreviewSets/\(setID)/appPreviews")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func deletePreview(id: String) async throws {
+        try await delete("/appPreviews/\(id)")
+    }
+
+    func reservePreview(setID: String, fileName: String, fileSize: Int) async throws -> (id: String, uploadURL: String) {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreviews",
+                "attributes": ["fileName": fileName, "fileSize": fileSize],
+                "relationships": [
+                    "appPreviewSet": ["data": ["type": "appPreviewSets", "id": setID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appPreviews", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String,
+            let attrs = d["attributes"] as? [String: Any],
+            let ops = attrs["uploadOperations"] as? [[String: Any]],
+            let url = ops.first?["url"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return (id, url)
+    }
+
+    func commitPreview(id: String, md5: String, fileSize: Int) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreviews",
+                "id": id,
+                "attributes": ["uploaded": true, "sourceFileChecksum": md5],
+            ]
+        ]
+        _ = try await patch("/appPreviews/\(id)", body: body)
+    }
+
+    // MARK: - Pricing & Territory
+
+    func getPriceSchedule(appID: String) async throws -> [String: Any] {
+        let data = try await get("/apps/\(appID)/appPriceSchedule?include=manualPrices,baseTerritories")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func getAvailableTerritories(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/availableTerritories")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Custom Product Pages
+
+    func getCustomProductPages(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/appCustomProductPages?fields[appCustomProductPages]=name,url,visible")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    // MARK: - Provisioning — Devices
+
+    func listDevices(limit: Int = 50) async throws -> [[String: Any]] {
+        let data = try await get("/devices?limit=\(limit)&fields[devices]=name,udid,deviceClass,status,platform")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func registerDevice(name: String, udid: String, platform: String = "IOS") async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "devices",
+                "attributes": ["name": name, "udid": udid, "platform": platform],
+            ]
+        ]
+        let response = try await post("/devices", body: body)
+        guard
+            let d = response["data"] as? [String: Any],
+            let id = d["id"] as? String
+        else { throw LaunchpadError.invalidResponse }
+        return id
+    }
+
+    // MARK: - Provisioning — Certificates
+
+    func listCertificates() async throws -> [[String: Any]] {
+        let data = try await get("/certificates?fields[certificates]=name,certificateType,expirationDate,displayName")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - In-App Events
 
     func getAppEvents(appID: String) async throws -> [[String: Any]] {

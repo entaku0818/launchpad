@@ -12,6 +12,7 @@ struct IOSCommand: ParsableCommand {
             IOSScreenshotsCommand.self,
             IOSBetaCommand.self,
             IOSEventsCommand.self,
+            IOSPreviewsCommand.self,
             IOSPhasedReleaseCommand.self,
             IOSReviewsCommand.self,
             IOSScheduleCommand.self,
