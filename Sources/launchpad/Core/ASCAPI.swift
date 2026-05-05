@@ -175,6 +175,26 @@ struct ASCAPIClient {
         _ = try await delete("/betaGroups/\(groupID)/relationships/betaTesters", body: body)
     }
 
+    // MARK: - In-App Events
+
+    func getAppEvents(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appEvents?filter[app]=\(appID)&fields[appEvents]=referenceName,badge,eventState,startDate,endDate")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getAppEvent(eventID: String) async throws -> [String: Any] {
+        let data = try await get("/appEvents/\(eventID)?include=localizations")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func publishAppEvent(eventID: String) async throws {
+        _ = try await post("/appEvents/\(eventID)/publish", body: [:])
+    }
+
+    func unpublishAppEvent(eventID: String) async throws {
+        _ = try await post("/appEvents/\(eventID)/unpublish", body: [:])
+    }
+
     // MARK: - Phased Release
 
     func getPhasedRelease(versionID: String) async throws -> (id: String, state: String)? {
