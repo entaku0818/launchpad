@@ -20,6 +20,9 @@ enum DotEnv {
                 value = String(value.dropFirst().dropLast())
             }
 
+            // unescape \n so multi-line values (e.g. PEM keys) can be stored on one line
+            value = value.replacingOccurrences(of: "\\n", with: "\n")
+
             // only set if not already set in environment
             if ProcessInfo.processInfo.environment[key] == nil {
                 setenv(key, value, 0)

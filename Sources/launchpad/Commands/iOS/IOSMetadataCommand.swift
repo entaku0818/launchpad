@@ -36,7 +36,14 @@ struct IOSMetadataCommand: AsyncParsableCommand {
 
         Logger.step("Fetching app info for \(bid) v\(ver)")
         let appID = try await client.findApp(bundleID: bid)
-        let versionID = try await client.getAppStoreVersion(appID: appID, version: ver)
+        let versionID: String
+        if version != nil {
+            versionID = try await client.getAppStoreVersion(appID: appID, version: ver)
+        } else {
+            let found = try await client.getLatestEditableAppStoreVersion(appID: appID)
+            Logger.info("Auto-detected editable version: \(found.version)")
+            versionID = found.id
+        }
         let localizations = try await client.getLocalizations(versionID: versionID)
 
         Logger.info("Found \(localizations.count) localizations")
