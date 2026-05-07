@@ -8,6 +8,7 @@ struct AndroidListingsCommand: ParsableCommand {
         subcommands: [
             AndroidListingsListCommand.self,
             AndroidListingsGetCommand.self,
+            AndroidListingsDeleteCommand.self,
         ]
     )
 }
@@ -65,5 +66,26 @@ struct AndroidListingsGetCommand: AsyncParsableCommand {
         if !shortDesc.isEmpty { print("Short desc:  \(shortDesc)") }
         if !fullDesc.isEmpty  { print("Full desc:\n\(fullDesc)") }
         if !video.isEmpty     { print("Promo video: \(video)") }
+    }
+}
+
+struct AndroidListingsDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete the store listing for a locale (commits the edit)")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Language code (e.g. en-US, ja-JP)")
+    var language: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting \(language) listing for \(pkg)")
+        try await client.deleteListing(packageName: pkg, language: language)
+        Logger.success("Listing deleted and edit committed")
     }
 }

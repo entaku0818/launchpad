@@ -534,6 +534,32 @@ struct GooglePlayClient {
         }
     }
 
+    func deactivateOffer(packageName: String, productID: String, basePlanID: String, offerID: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers/\(offerID):deactivate")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func deleteOffer(packageName: String, productID: String, basePlanID: String, offerID: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers/\(offerID)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     // MARK: - Voided Purchases (Refunds)
 
     func listVoidedPurchases(packageName: String, limit: Int = 20) async throws -> [[String: Any]] {
@@ -1246,6 +1272,22 @@ struct GooglePlayClient {
             throw LaunchpadError.invalidResponse
         }
         return json["listings"] as? [[String: Any]] ?? []
+    }
+
+    func deleteListing(packageName: String, language: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(language)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
     func getListing(packageName: String, language: String) async throws -> [String: Any] {

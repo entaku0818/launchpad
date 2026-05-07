@@ -1214,6 +1214,86 @@ struct ASCAPIClient {
         return infos.first ?? [:]
     }
 
+    func updateAppInfo(appInfoID: String, primaryLocale: String?, primaryCategoryID: String?, secondaryCategoryID: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let primaryLocale { attrs["primaryLocale"] = primaryLocale }
+        var rels: [String: Any] = [:]
+        if let cat = primaryCategoryID {
+            rels["primaryCategory"] = ["data": ["type": "appCategories", "id": cat]]
+        }
+        if let cat = secondaryCategoryID {
+            rels["secondaryCategory"] = ["data": ["type": "appCategories", "id": cat]]
+        }
+        var dataBody: [String: Any] = ["type": "appInfos", "id": appInfoID]
+        if !attrs.isEmpty { dataBody["attributes"] = attrs }
+        if !rels.isEmpty  { dataBody["relationships"] = rels }
+        let body: [String: Any] = ["data": dataBody]
+        _ = try await patch("/appInfos/\(appInfoID)", body: body)
+    }
+
+    // MARK: - IAP Localizations
+
+    func listIAPLocalizations(iapID: String) async throws -> [[String: Any]] {
+        let data = try await get("/inAppPurchasesV2/\(iapID)/inAppPurchaseLocalizations")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createIAPLocalization(iapID: String, locale: String, name: String, description: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale, "name": name]
+        if let description { attrs["description"] = description }
+        let body: [String: Any] = [
+            "data": [
+                "type": "inAppPurchaseLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "inAppPurchaseV2": ["data": ["type": "inAppPurchases", "id": iapID]]
+                ],
+            ]
+        ]
+        let response = try await post("/inAppPurchaseLocalizations", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateIAPLocalization(localizationID: String, name: String?, description: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let name        { attrs["name"] = name }
+        if let description { attrs["description"] = description }
+        let body: [String: Any] = [
+            "data": ["type": "inAppPurchaseLocalizations", "id": localizationID, "attributes": attrs]
+        ]
+        _ = try await patch("/inAppPurchaseLocalizations/\(localizationID)", body: body)
+    }
+
+    func deleteIAPLocalization(localizationID: String) async throws {
+        try await delete("/inAppPurchaseLocalizations/\(localizationID)")
+    }
+
+    // MARK: - Screenshot Set Management
+
+    func createScreenshotSet(localizationID: String, screenshotDisplayType: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appScreenshotSets",
+                "attributes": ["screenshotDisplayType": screenshotDisplayType],
+                "relationships": [
+                    "appStoreVersionLocalization": ["data": ["type": "appStoreVersionLocalizations", "id": localizationID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appScreenshotSets", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteScreenshotSet(setID: String) async throws {
+        try await delete("/appScreenshotSets/\(setID)")
+    }
+
     // MARK: - In-App Purchases (ASC API)
 
     func listInAppPurchases(appID: String) async throws -> [[String: Any]] {

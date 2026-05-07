@@ -8,6 +8,7 @@ struct IOSAppInfoCommand: AsyncParsableCommand {
         subcommands: [
             IOSAppInfoListCommand.self,
             IOSAppInfoUpdateCommand.self,
+            IOSAppInfoSetLocaleCommand.self,
         ]
     )
 }
@@ -79,5 +80,38 @@ struct IOSAppInfoUpdateCommand: AsyncParsableCommand {
             privacyPolicyText: privacyPolicyText
         )
         Logger.success("App info localization updated")
+    }
+}
+
+struct IOSAppInfoSetLocaleCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set-locale", abstract: "Set the primary locale for the app")
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    @Option(name: .long, help: "Primary locale code (e.g. en-US, ja)")
+    var locale: String
+
+    @Option(name: .long, help: "Primary category ID (optional, from ios categories list)")
+    var primaryCategoryID: String?
+
+    @Option(name: .long, help: "Secondary category ID (optional)")
+    var secondaryCategoryID: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id or ios.bundleId required"); Foundation.exit(1) }()
+
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        Logger.step("Fetching app info for \(bid)")
+        let info = try await client.getAppInfo(appID: appID)
+        guard let infoID = info["id"] as? String else {
+            Logger.error("App info not found"); Foundation.exit(1)
+        }
+        Logger.step("Updating primary locale to \(locale)")
+        try await client.updateAppInfo(appInfoID: infoID, primaryLocale: locale, primaryCategoryID: primaryCategoryID, secondaryCategoryID: secondaryCategoryID)
+        Logger.success("App info updated")
     }
 }
