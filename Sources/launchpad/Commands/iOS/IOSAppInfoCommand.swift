@@ -9,6 +9,8 @@ struct IOSAppInfoCommand: AsyncParsableCommand {
             IOSAppInfoListCommand.self,
             IOSAppInfoUpdateCommand.self,
             IOSAppInfoSetLocaleCommand.self,
+            IOSAppInfoCreateLocaleCommand.self,
+            IOSAppInfoDeleteLocaleCommand.self,
         ]
     )
 }
@@ -80,6 +82,56 @@ struct IOSAppInfoUpdateCommand: AsyncParsableCommand {
             privacyPolicyText: privacyPolicyText
         )
         Logger.success("App info localization updated")
+    }
+}
+
+struct IOSAppInfoCreateLocaleCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create-locale", abstract: "Add a new locale to the app's localized info")
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    @Option(name: .long, help: "Locale code (e.g. ja, fr-FR)")
+    var locale: String
+
+    @Option(name: .long, help: "App name for this locale")
+    var name: String?
+
+    @Option(name: .long, help: "Subtitle")
+    var subtitle: String?
+
+    @Option(name: .long, help: "Privacy policy URL")
+    var privacyPolicyURL: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id required"); Foundation.exit(1) }()
+
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        let info = try await client.getAppInfo(appID: appID)
+        guard let appInfoID = info["id"] as? String else {
+            Logger.error("App info not found"); Foundation.exit(1)
+        }
+        Logger.step("Creating '\(locale)' app info localization")
+        let id = try await client.createAppInfoLocalization(appInfoID: appInfoID, locale: locale, name: name, subtitle: subtitle, privacyPolicyURL: privacyPolicyURL)
+        Logger.success("Locale created: \(id)")
+    }
+}
+
+struct IOSAppInfoDeleteLocaleCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-locale", abstract: "Remove a locale from the app's localized info")
+
+    @Option(name: .long, help: "App info localization ID (from app-info list)")
+    var localizationID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting app info localization \(localizationID)")
+        try await client.deleteAppInfoLocalization(localizationID: localizationID)
+        Logger.success("Locale deleted")
     }
 }
 

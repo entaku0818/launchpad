@@ -1490,6 +1490,61 @@ struct ASCAPIClient {
         _ = try await patch("/appInfoLocalizations/\(localizationID)", body: body)
     }
 
+    func createAppInfoLocalization(appInfoID: String, locale: String, name: String?, subtitle: String?, privacyPolicyURL: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale]
+        if let n = name { attrs["name"] = n }
+        if let s = subtitle { attrs["subtitle"] = s }
+        if let u = privacyPolicyURL { attrs["privacyPolicyUrl"] = u }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appInfoLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "appInfo": ["data": ["type": "appInfos", "id": appInfoID]]
+                ],
+            ]
+        ]
+        let resp = try await post("/appInfoLocalizations", body: body)
+        guard let d = resp["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteAppInfoLocalization(localizationID: String) async throws {
+        try await delete("/appInfoLocalizations/\(localizationID)")
+    }
+
+    // MARK: - Review Submissions
+
+    func createReviewSubmission(appID: String, platform: String = "IOS") async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "reviewSubmissions",
+                "attributes": ["platform": platform],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ],
+            ]
+        ]
+        let resp = try await post("/reviewSubmissions", body: body)
+        guard let d = resp["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func cancelReviewSubmission(submissionID: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "reviewSubmissions",
+                "id": submissionID,
+                "attributes": ["canceled": true],
+            ]
+        ]
+        _ = try await patch("/reviewSubmissions/\(submissionID)", body: body)
+    }
+
     // MARK: - App Categories
 
     func getAppInfo(appID: String) async throws -> [String: Any] {
