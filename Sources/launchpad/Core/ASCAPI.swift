@@ -682,6 +682,20 @@ struct ASCAPIClient {
         return data["data"] as? [String: Any] ?? [:]
     }
 
+    func getBuildIcons(buildID: String) async throws -> [[String: Any]] {
+        let data = try await get("/builds/\(buildID)/icons")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func resendBetaTestInvitation(testerID: String) async throws {
+        let body: [String: Any] = [
+            "data": ["type": "betaTesterInvitations", "relationships": [
+                "betaTester": ["data": ["type": "betaTesters", "id": testerID]]
+            ]]
+        ]
+        _ = try await post("/betaTesterInvitations", body: body)
+    }
+
     // MARK: - Sandbox Testers
 
     func listSandboxTesters() async throws -> [[String: Any]] {

@@ -1040,6 +1040,40 @@ struct GooglePlayClient {
         }
     }
 
+    func consumePurchase(packageName: String, productID: String, token: String) async throws {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/products/\(productID)/tokens/\(token):consume")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func deferSubscription(packageName: String, subscriptionID: String, token: String, desiredExpiryTimeMillis: Int64) async throws -> Int64 {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/tokens/\(token):defer")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [
+            "deferralInfo": ["desiredExpiryTimeMillis": String(desiredExpiryTimeMillis)]
+        ])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let ms = json["newExpiryTimeMillis"] as? String,
+              let millis = Int64(ms) else {
+            throw LaunchpadError.invalidResponse
+        }
+        return millis
+    }
+
     func acknowledgeSubscription(packageName: String, subscriptionID: String, token: String) async throws {
         let accessTkn = try await accessToken()
         let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/tokens/\(token):acknowledge")!

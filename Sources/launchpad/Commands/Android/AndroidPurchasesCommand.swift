@@ -10,6 +10,8 @@ struct AndroidPurchasesCommand: AsyncParsableCommand {
             AndroidPurchasesVerifySubscriptionCommand.self,
             AndroidPurchasesAcknowledgeProductCommand.self,
             AndroidPurchasesAcknowledgeSubscriptionCommand.self,
+            AndroidPurchasesConsumeCommand.self,
+            AndroidPurchasesDeferCommand.self,
         ]
     )
 }
@@ -141,5 +143,56 @@ struct AndroidPurchasesAcknowledgeSubscriptionCommand: AsyncParsableCommand {
         Logger.step("Acknowledging subscription: \(subscriptionID)")
         try await client.acknowledgeSubscription(packageName: pkg, subscriptionID: subscriptionID, token: token)
         Logger.success("Subscription acknowledged")
+    }
+}
+
+struct AndroidPurchasesConsumeCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "consume", abstract: "Consume a one-time purchase (marks as consumed so it can be repurchased)")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product ID (SKU)")
+    var productID: String
+
+    @Option(name: .long, help: "Purchase token")
+    var token: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Consuming purchase of \(productID)")
+        try await client.consumePurchase(packageName: pkg, productID: productID, token: token)
+        Logger.success("Purchase consumed")
+    }
+}
+
+struct AndroidPurchasesDeferCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "defer", abstract: "Defer a subscription renewal to a future date")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var subscriptionID: String
+
+    @Option(name: .long, help: "Purchase token")
+    var token: String
+
+    @Option(name: .long, help: "Desired expiry time in Unix milliseconds")
+    var expiryTimeMillis: Int64
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deferring subscription \(subscriptionID) to \(expiryTimeMillis)ms")
+        let newExpiry = try await client.deferSubscription(packageName: pkg, subscriptionID: subscriptionID, token: token, desiredExpiryTimeMillis: expiryTimeMillis)
+        Logger.success("Subscription deferred. New expiry: \(newExpiry) ms")
     }
 }

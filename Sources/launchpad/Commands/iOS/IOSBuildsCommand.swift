@@ -12,6 +12,8 @@ struct IOSBuildsCommand: AsyncParsableCommand {
             IOSBuildsReviewCommand.self,
             IOSBuildsAssignGroupsCommand.self,
             IOSBuildsRemoveGroupsCommand.self,
+            IOSBuildsIconsCommand.self,
+            IOSBuildsResendInviteCommand.self,
         ]
     )
 }
@@ -191,5 +193,44 @@ struct IOSBuildsRemoveGroupsCommand: AsyncParsableCommand {
         Logger.step("Removing build \(buildID) from \(ids.count) group(s)")
         try await client.removeBuildFromBetaGroups(buildID: buildID, groupIDs: ids)
         Logger.success("Build removed from beta groups")
+    }
+}
+
+struct IOSBuildsIconsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "icons", abstract: "Show build icons for a build")
+
+    @Option(name: .long, help: "Build ID (from builds list)")
+    var buildID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching icons for build \(buildID)")
+        let icons = try await client.getBuildIcons(buildID: buildID)
+
+        if icons.isEmpty { Logger.info("No icons found"); return }
+        for icon in icons {
+            guard let attrs = icon["attributes"] as? [String: Any] else { continue }
+            let name  = attrs["iconAsset"] as? [String: Any]
+            let url   = name?["url"] as? String ?? "-"
+            let dim   = attrs["iconAsset"] as? [String: Any]
+            let width = (dim?["width"] as? Int).map { "\($0)px" } ?? "-"
+            print("  \(width)  \(url)")
+        }
+    }
+}
+
+struct IOSBuildsResendInviteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "resend-invite", abstract: "Resend TestFlight invitation email to a beta tester")
+
+    @Option(name: .long, help: "Beta tester ID (from beta groups list)")
+    var testerID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Resending TestFlight invitation to tester \(testerID)")
+        try await client.resendBetaTestInvitation(testerID: testerID)
+        Logger.success("Invitation resent")
     }
 }
