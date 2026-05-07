@@ -456,6 +456,88 @@ struct ASCAPIClient {
         return data["data"] as? [String: Any] ?? [:]
     }
 
+    // MARK: - Team (ASC Users)
+
+    func listTeamUsers() async throws -> [[String: Any]] {
+        let data = try await get("/users?fields[users]=username,firstName,lastName,roles,allAppsVisible&limit=50")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func inviteUser(email: String, firstName: String, lastName: String, roles: [String]) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "userInvitations",
+                "attributes": [
+                    "email": email,
+                    "firstName": firstName,
+                    "lastName": lastName,
+                    "roles": roles,
+                    "allAppsVisible": true,
+                ],
+            ]
+        ]
+        _ = try await post("/userInvitations", body: body)
+    }
+
+    func removeUser(userID: String) async throws {
+        try await delete("/users/\(userID)")
+    }
+
+    // MARK: - TestFlight Build Localizations
+
+    func getBuildLocalizations(buildID: String) async throws -> [[String: Any]] {
+        let data = try await get("/builds/\(buildID)/betaBuildLocalizations?fields[betaBuildLocalizations]=locale,whatsNew")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func updateBuildLocalization(localizationID: String, whatsNew: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaBuildLocalizations",
+                "id": localizationID,
+                "attributes": ["whatsNew": whatsNew],
+            ]
+        ]
+        _ = try await patch("/betaBuildLocalizations/\(localizationID)", body: body)
+    }
+
+    func createBuildLocalization(buildID: String, locale: String, whatsNew: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaBuildLocalizations",
+                "attributes": ["locale": locale, "whatsNew": whatsNew],
+                "relationships": [
+                    "build": ["data": ["type": "builds", "id": buildID]]
+                ],
+            ]
+        ]
+        _ = try await post("/betaBuildLocalizations", body: body)
+    }
+
+    // MARK: - TestFlight Beta Review Submission
+
+    func submitForBetaReview(buildID: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaAppReviewSubmissions",
+                "relationships": [
+                    "build": ["data": ["type": "builds", "id": buildID]]
+                ],
+            ]
+        ]
+        _ = try await post("/betaAppReviewSubmissions", body: body)
+    }
+
+    func getBetaReviewStatus(buildID: String) async throws -> String {
+        let data = try await get("/builds/\(buildID)/betaAppReviewSubmission?fields[betaAppReviewSubmissions]=betaReviewState")
+        guard
+            let d = data["data"] as? [String: Any],
+            let attrs = d["attributes"] as? [String: Any],
+            let state = attrs["betaReviewState"] as? String
+        else { return "NOT_SUBMITTED" }
+        return state
+    }
+
     // MARK: - App Clips
 
     func getAppClips(appID: String) async throws -> [[String: Any]] {
