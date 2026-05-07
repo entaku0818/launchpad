@@ -704,6 +704,51 @@ struct ASCAPIClient {
         try await delete("/appStoreVersionExperiments/\(experimentID)")
     }
 
+    // MARK: - Export Compliance (Encryption Declarations)
+
+    func listEncryptionDeclarations(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/appEncryptionDeclarations?filter[app]=\(appID)&limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createEncryptionDeclaration(appID: String, platform: String, usesEncryption: Bool, exempt: Bool, containsProprietaryCryptography: Bool, containsThirdPartyCryptography: Bool, availableOnFrenchStore: Bool, documentURL: String?) async throws -> String {
+        var attrs: [String: Any] = [
+            "platform": platform,
+            "usesEncryption": usesEncryption,
+            "exempt": exempt,
+            "containsProprietaryCryptography": containsProprietaryCryptography,
+            "containsThirdPartyCryptography": containsThirdPartyCryptography,
+            "availableOnFrenchStore": availableOnFrenchStore,
+        ]
+        if let url = documentURL { attrs["documentUrl"] = url }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appEncryptionDeclarations",
+                "attributes": attrs,
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appEncryptionDeclarations", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    // MARK: - Xcode Cloud Artifacts & Test Results
+
+    func listCIArtifacts(buildRunID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciBuildRuns/\(buildRunID)/artifacts?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listCITestResults(buildRunID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciBuildRuns/\(buildRunID)/testResults?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Source Code Manager (SCM for Xcode Cloud)
 
     func listSCMProviders() async throws -> [[String: Any]] {

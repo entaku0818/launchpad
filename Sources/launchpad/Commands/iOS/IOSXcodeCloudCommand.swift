@@ -10,6 +10,8 @@ struct IOSXcodeCloudCommand: AsyncParsableCommand {
             IOSXcodeCloudWorkflowsCommand.self,
             IOSXcodeCloudBuildsCommand.self,
             IOSXcodeCloudStartCommand.self,
+            IOSXcodeCloudArtifactsCommand.self,
+            IOSXcodeCloudTestResultsCommand.self,
         ]
     )
 }
@@ -111,5 +113,55 @@ struct IOSXcodeCloudStartCommand: AsyncParsableCommand {
         Logger.step("Starting build run for workflow \(workflowID)")
         let runID = try await client.startCIBuild(workflowID: workflowID, gitReferenceID: gitReferenceID)
         Logger.success("Build run started: \(runID)")
+    }
+}
+
+struct IOSXcodeCloudArtifactsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "artifacts", abstract: "List build artifacts for a CI build run")
+
+    @Option(name: .long, help: "Build run ID")
+    var buildRunID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching artifacts for build run \(buildRunID)")
+        let artifacts = try await client.listCIArtifacts(buildRunID: buildRunID)
+
+        if artifacts.isEmpty { Logger.info("No artifacts found"); return }
+        Logger.info("\(artifacts.count) artifact(s)\n")
+        for a in artifacts {
+            guard let id = a["id"] as? String,
+                  let attrs = a["attributes"] as? [String: Any] else { continue }
+            let name      = attrs["fileName"] as? String ?? "-"
+            let fileType  = attrs["fileType"] as? String ?? "-"
+            let size      = attrs["fileSize"] as? Int ?? 0
+            print("  \(name)  [\(fileType)]  \(size / 1024) KB  id: \(id)")
+        }
+    }
+}
+
+struct IOSXcodeCloudTestResultsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "test-results", abstract: "List test results for a CI build run")
+
+    @Option(name: .long, help: "Build run ID")
+    var buildRunID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching test results for build run \(buildRunID)")
+        let results = try await client.listCITestResults(buildRunID: buildRunID)
+
+        if results.isEmpty { Logger.info("No test results found"); return }
+        Logger.info("\(results.count) test result(s)\n")
+        for r in results {
+            guard let attrs = r["attributes"] as? [String: Any] else { continue }
+            let className  = attrs["className"] as? String ?? "-"
+            let testName   = attrs["name"] as? String ?? "-"
+            let status     = attrs["status"] as? String ?? "-"
+            let icon = status == "SUCCESS" ? "✓" : status == "FAILURE" ? "✗" : status == "SKIPPED" ? "⊘" : "●"
+            print("  \(icon) \(className).\(testName)  [\(status)]")
+        }
     }
 }
