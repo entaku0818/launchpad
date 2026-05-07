@@ -550,6 +550,40 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Xcode Cloud (CI)
+
+    func listCIProducts(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciProducts?filter[app]=\(appID)&limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listCIWorkflows(productID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciProducts/\(productID)/workflows?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listCIBuilds(workflowID: String, limit: Int = 10) async throws -> [[String: Any]] {
+        let json = try await get("/ciWorkflows/\(workflowID)/buildRuns?limit=\(limit)&sort=-createdDate")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func startCIBuild(workflowID: String, gitReferenceID: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "ciBuildRuns",
+                "relationships": [
+                    "workflow": ["data": ["type": "ciWorkflows", "id": workflowID]],
+                    "sourceBranchOrTag": ["data": ["type": "scmGitReferences", "id": gitReferenceID]],
+                ]
+            ]
+        ]
+        let json = try await post("/ciBuildRuns", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
     // MARK: - Beta Feedback
 
     func getBetaFeedback(appID: String, limit: Int = 20) async throws -> [[String: Any]] {
