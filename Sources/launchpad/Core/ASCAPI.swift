@@ -710,6 +710,31 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - API Keys
+
+    func listAPIKeys() async throws -> [[String: Any]] {
+        let json = try await get("/apiKeys?limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createAPIKey(name: String, roles: [String]) async throws -> [String: Any] {
+        let body: [String: Any] = [
+            "data": [
+                "type": "apiKeys",
+                "attributes": [
+                    "nickname": name,
+                    "roles": roles,
+                ]
+            ]
+        ]
+        let json = try await post("/apiKeys", body: body)
+        return json["data"] as? [String: Any] ?? [:]
+    }
+
+    func revokeAPIKey(keyID: String) async throws {
+        try await delete("/apiKeys/\(keyID)")
+    }
+
     // MARK: - EULA (End User License Agreements)
 
     func listEULAs() async throws -> [[String: Any]] {

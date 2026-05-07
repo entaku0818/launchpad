@@ -35,6 +35,7 @@ struct IOSCommand: ParsableCommand {
             IOSGameCenterCommand.self,
             IOSPreOrderCommand.self,
             IOSEULACommand.self,
+            IOSAPIKeysCommand.self,
         ]
     )
 }
