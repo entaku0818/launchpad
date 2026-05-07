@@ -1217,6 +1217,65 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Routing App Coverage
+
+    func getRoutingAppCoverage(versionID: String) async throws -> [String: Any]? {
+        let data = try await get("/appStoreVersions/\(versionID)/routingAppCoverage")
+        return data["data"] as? [String: Any]
+    }
+
+    func uploadRoutingAppCoverage(versionID: String, filePath: String) async throws -> String {
+        let fileData = try Data(contentsOf: URL(fileURLWithPath: filePath))
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+
+        let reserveBody: [String: Any] = [
+            "data": [
+                "type": "routingAppCoverages",
+                "attributes": [
+                    "fileName": fileName,
+                    "fileSize": fileData.count,
+                ],
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]]
+                ],
+            ]
+        ]
+        let reserveResp = try await post("/routingAppCoverages", body: reserveBody)
+        guard
+            let d = reserveResp["data"] as? [String: Any],
+            let id = d["id"] as? String,
+            let attrs = d["attributes"] as? [String: Any],
+            let uploadOps = attrs["uploadOperations"] as? [[String: Any]]
+        else { throw LaunchpadError.invalidResponse }
+
+        for op in uploadOps {
+            guard let urlStr = op["url"] as? String,
+                  let url = URL(string: urlStr),
+                  let method = op["method"] as? String else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = method
+            if let headers = op["requestHeaders"] as? [[String: String]] {
+                for h in headers {
+                    if let name = h["name"], let value = h["value"] { req.setValue(value, forHTTPHeaderField: name) }
+                }
+            }
+            let offset = op["offset"] as? Int ?? 0
+            let length = op["length"] as? Int ?? fileData.count
+            req.httpBody = fileData.subdata(in: offset..<(offset + length))
+            _ = try await URLSession.shared.data(for: req)
+        }
+
+        let commitBody: [String: Any] = [
+            "data": ["type": "routingAppCoverages", "id": id, "attributes": ["uploaded": true]]
+        ]
+        _ = try await patch("/routingAppCoverages/\(id)", body: commitBody)
+        return id
+    }
+
+    func deleteRoutingAppCoverage(coverageID: String) async throws {
+        try await delete("/routingAppCoverages/\(coverageID)")
+    }
+
     // MARK: - Submit for Review
 
     func submitForReview(versionID: String) async throws {

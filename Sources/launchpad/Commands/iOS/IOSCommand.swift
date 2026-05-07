@@ -51,6 +51,7 @@ struct IOSCommand: ParsableCommand {
             IOSAlternativeDistributionCommand.self,
             IOSBetaAppLocalizationsCommand.self,
             IOSWinBackOffersCommand.self,
+            IOSRoutingCoverageCommand.self,
         ]
     )
 }
