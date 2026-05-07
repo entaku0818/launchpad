@@ -54,6 +54,7 @@ struct IOSCommand: ParsableCommand {
             IOSRoutingCoverageCommand.self,
             IOSLocalizationsCommand.self,
             IOSPromotionalOffersCommand.self,
+            IOSSubscriptionImagesCommand.self,
         ]
     )
 }

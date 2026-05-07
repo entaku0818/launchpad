@@ -1101,6 +1101,65 @@ struct ASCAPIClient {
         try await delete("/inAppPurchasesV2/\(iapID)")
     }
 
+    // MARK: - Subscription Images
+
+    func listSubscriptionImages(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/subscriptionImages")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscriptionImage(subscriptionID: String, filePath: String) async throws -> String {
+        let fileData = try Data(contentsOf: URL(fileURLWithPath: filePath))
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+
+        let reserveBody: [String: Any] = [
+            "data": [
+                "type": "subscriptionImages",
+                "attributes": [
+                    "fileName": fileName,
+                    "fileSize": fileData.count,
+                ],
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]]
+                ],
+            ]
+        ]
+        let reserveResp = try await post("/subscriptionImages", body: reserveBody)
+        guard
+            let d = reserveResp["data"] as? [String: Any],
+            let id = d["id"] as? String,
+            let attrs = d["attributes"] as? [String: Any],
+            let uploadOps = attrs["uploadOperations"] as? [[String: Any]]
+        else { throw LaunchpadError.invalidResponse }
+
+        for op in uploadOps {
+            guard let urlStr = op["url"] as? String,
+                  let url = URL(string: urlStr),
+                  let method = op["method"] as? String else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = method
+            if let headers = op["requestHeaders"] as? [[String: String]] {
+                for h in headers {
+                    if let name = h["name"], let value = h["value"] { req.setValue(value, forHTTPHeaderField: name) }
+                }
+            }
+            let offset = op["offset"] as? Int ?? 0
+            let length = op["length"] as? Int ?? fileData.count
+            req.httpBody = fileData.subdata(in: offset..<(offset + length))
+            _ = try await URLSession.shared.data(for: req)
+        }
+
+        let commitBody: [String: Any] = [
+            "data": ["type": "subscriptionImages", "id": id, "attributes": ["uploaded": true]]
+        ]
+        _ = try await patch("/subscriptionImages/\(id)", body: commitBody)
+        return id
+    }
+
+    func deleteSubscriptionImage(imageID: String) async throws {
+        try await delete("/subscriptionImages/\(imageID)")
+    }
+
     // MARK: - Subscription Groups
 
     func getSubscriptionGroups(appID: String) async throws -> [[String: Any]] {
