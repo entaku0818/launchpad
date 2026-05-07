@@ -2161,6 +2161,39 @@ struct ASCAPIClient {
         try await delete("/routingAppCoverages/\(coverageID)")
     }
 
+    // MARK: - App Review Detail (reviewer notes, demo account)
+
+    func getReviewDetail(versionID: String) async throws -> [String: Any] {
+        let data = try await get("/appStoreVersions/\(versionID)/appStoreReviewDetail")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func updateReviewDetail(
+        detailID: String,
+        notes: String?,
+        demoAccountName: String?,
+        demoAccountPassword: String?,
+        demoAccountRequired: Bool?,
+        contactFirstName: String?,
+        contactLastName: String?,
+        contactEmail: String?,
+        contactPhone: String?
+    ) async throws {
+        var attrs: [String: Any] = [:]
+        if let notes            { attrs["notes"] = notes }
+        if let demoAccountName  { attrs["demoAccountName"] = demoAccountName }
+        if let demoAccountPassword { attrs["demoAccountPassword"] = demoAccountPassword }
+        if let demoAccountRequired { attrs["demoAccountRequired"] = demoAccountRequired }
+        if let contactFirstName { attrs["contactFirstName"] = contactFirstName }
+        if let contactLastName  { attrs["contactLastName"] = contactLastName }
+        if let contactEmail     { attrs["contactEmail"] = contactEmail }
+        if let contactPhone     { attrs["contactPhone"] = contactPhone }
+        let body: [String: Any] = [
+            "data": ["type": "appStoreReviewDetails", "id": detailID, "attributes": attrs]
+        ]
+        _ = try await patch("/appStoreReviewDetails/\(detailID)", body: body)
+    }
+
     // MARK: - Submit for Review
 
     func submitForReview(versionID: String) async throws {
