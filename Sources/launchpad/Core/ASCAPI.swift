@@ -824,6 +824,32 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func getAppClipAdvancedExperiences(appClipID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appClips/\(appClipID)/appClipAdvancedExperiences?limit=50")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createAppClipAdvancedExperience(appClipID: String, invocationURL: String, placeID: String?, action: String) async throws -> String {
+        var attrs: [String: Any] = ["invocationURL": invocationURL, "action": action, "isPoweredBy": false]
+        if let placeID { attrs["placeID"] = placeID }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appClipAdvancedExperiences",
+                "attributes": attrs,
+                "relationships": ["appClip": ["data": ["type": "appClips", "id": appClipID]]],
+            ]
+        ]
+        let response = try await post("/appClipAdvancedExperiences", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteAppClipAdvancedExperience(experienceID: String) async throws {
+        try await delete("/appClipAdvancedExperiences/\(experienceID)")
+    }
+
     // MARK: - Build Beta Group Assignment
 
     func assignBuildToBetaGroups(buildID: String, groupIDs: [String]) async throws {
