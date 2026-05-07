@@ -10,6 +10,8 @@ struct AndroidIAPCommand: AsyncParsableCommand {
             AndroidIAPGetCommand.self,
             AndroidIAPActivateCommand.self,
             AndroidIAPDeactivateCommand.self,
+            AndroidIAPCreateCommand.self,
+            AndroidIAPDeleteCommand.self,
         ]
     )
 }
@@ -146,5 +148,74 @@ struct AndroidIAPDeactivateCommand: AsyncParsableCommand {
         Logger.step("Deactivating \(sku)")
         try await client.updateIAPStatus(packageName: pkg, sku: sku, status: "inactive")
         Logger.success("\(sku) deactivated")
+    }
+}
+
+// MARK: - create
+
+struct AndroidIAPCreateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create", abstract: "Create a new in-app product")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product SKU")
+    var sku: String
+
+    @Option(name: .long, help: "Product type: inapp or subs (default: inapp)")
+    var productType: String = "inapp"
+
+    @Option(name: .long, help: "Default price (e.g. 0.99)")
+    var price: Double
+
+    @Option(name: .long, help: "Currency code (e.g. USD)")
+    var currency: String = "USD"
+
+    @Option(name: .long, help: "Default title (English)")
+    var title: String
+
+    @Option(name: .long, help: "Default description (English)")
+    var description: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Creating IAP product '\(sku)'")
+        try await client.createIAP(
+            packageName: pkg,
+            sku: sku,
+            productType: productType,
+            defaultPrice: price,
+            defaultPriceCurrency: currency,
+            titles: ["en-US": title],
+            descriptions: ["en-US": description]
+        )
+        Logger.success("IAP product '\(sku)' created")
+    }
+}
+
+// MARK: - delete
+
+struct AndroidIAPDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete an in-app product")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product SKU")
+    var sku: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting IAP product '\(sku)'")
+        try await client.deleteIAP(packageName: pkg, sku: sku)
+        Logger.success("IAP product '\(sku)' deleted")
     }
 }

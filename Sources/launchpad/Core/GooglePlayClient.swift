@@ -273,6 +273,46 @@ struct GooglePlayClient {
         return json
     }
 
+    func createIAP(packageName: String, sku: String, productType: String, defaultPrice: Double, defaultPriceCurrency: String, titles: [String: String], descriptions: [String: String]) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var listings: [String: [String: String]] = [:]
+        for (lang, title) in titles {
+            listings[lang] = ["title": title, "description": descriptions[lang] ?? ""]
+        }
+
+        let body: [String: Any] = [
+            "packageName": packageName,
+            "sku": sku,
+            "productType": productType,
+            "status": "active",
+            "defaultPrice": ["priceMicros": "\(Int(defaultPrice * 1_000_000))", "currency": defaultPriceCurrency],
+            "listings": listings,
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func deleteIAP(packageName: String, sku: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts/\(sku)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func updateIAPStatus(packageName: String, sku: String, status: String) async throws {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts/\(sku)")!
