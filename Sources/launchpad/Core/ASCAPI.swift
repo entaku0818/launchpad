@@ -481,6 +481,11 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func getCustomerReview(reviewID: String) async throws -> [String: Any] {
+        let data = try await get("/customerReviews/\(reviewID)?include=response")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
     func replyToReview(reviewID: String, body: String) async throws {
         let requestBody: [String: Any] = [
             "data": [

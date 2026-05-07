@@ -7,6 +7,7 @@ struct IOSReviewsCommand: AsyncParsableCommand {
         abstract: "Manage App Store customer reviews",
         subcommands: [
             IOSReviewsListCommand.self,
+            IOSReviewsGetCommand.self,
             IOSReviewsReplyCommand.self,
             IOSReviewsDeleteReplyCommand.self,
         ],
@@ -62,6 +63,46 @@ struct IOSReviewsListCommand: AsyncParsableCommand {
             }
             print()
         }
+    }
+}
+
+// MARK: - get
+
+struct IOSReviewsGetCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "get",
+        abstract: "Get a single customer review by ID"
+    )
+
+    @Option(name: .long, help: "Review ID (from reviews list)")
+    var reviewID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+
+        Logger.step("Fetching review \(reviewID)")
+        let review = try await client.getCustomerReview(reviewID: reviewID)
+
+        guard let id = review["id"] as? String,
+              let attrs = review["attributes"] as? [String: Any] else {
+            Logger.info("No review data found")
+            return
+        }
+        let rating   = attrs["rating"] as? Int ?? 0
+        let title    = attrs["title"] as? String ?? ""
+        let body     = attrs["body"] as? String ?? ""
+        let reviewer = attrs["reviewerNickname"] as? String ?? "Anonymous"
+        let date     = attrs["createdDate"] as? String ?? ""
+        let territory = attrs["territory"] as? String ?? ""
+        let stars    = String(repeating: "★", count: rating) + String(repeating: "☆", count: 5 - rating)
+        print("ID:       \(id)")
+        print("Rating:   \(stars)")
+        print("Title:    \(title)")
+        print("Body:     \(body)")
+        print("Reviewer: \(reviewer)")
+        print("Date:     \(date)")
+        if !territory.isEmpty { print("Territory: \(territory)") }
     }
 }
 
