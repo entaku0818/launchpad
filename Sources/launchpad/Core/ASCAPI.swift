@@ -162,6 +162,32 @@ struct ASCAPIClient {
         _ = try await post("/betaTesters", body: createBody)
     }
 
+    func createBetaGroup(appID: String, name: String, publicLinkEnabled: Bool, feedbackEnabled: Bool) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaGroups",
+                "attributes": [
+                    "name": name,
+                    "isInternalGroup": false,
+                    "publicLinkEnabled": publicLinkEnabled,
+                    "feedbackEnabled": feedbackEnabled,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/betaGroups", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteBetaGroup(groupID: String) async throws {
+        try await delete("/betaGroups/\(groupID)")
+    }
+
     func removeBetaTester(email: String, groupID: String) async throws {
         // find tester ID by email
         let encoded = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? email
@@ -264,11 +290,68 @@ struct ASCAPIClient {
         return id
     }
 
+    // MARK: - Provisioning — Bundle IDs
+
+    func listBundleIDs(limit: Int = 50) async throws -> [[String: Any]] {
+        let json = try await get("/bundleIds?limit=\(limit)&fields[bundleIds]=identifier,name,platform,seedId")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func registerBundleID(identifier: String, name: String, platform: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "bundleIds",
+                "attributes": [
+                    "identifier": identifier,
+                    "name": name,
+                    "platform": platform,
+                ]
+            ]
+        ]
+        let json = try await post("/bundleIds", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteBundleID(bundleIDResourceID: String) async throws {
+        try await delete("/bundleIds/\(bundleIDResourceID)")
+    }
+
+    // MARK: - Provisioning — Profiles
+
+    func listProfiles(limit: Int = 50) async throws -> [[String: Any]] {
+        let json = try await get("/profiles?limit=\(limit)&fields[profiles]=name,profileType,profileState,expirationDate,uuid")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func downloadProfile(profileID: String) async throws -> Data {
+        let json = try await get("/profiles/\(profileID)?fields[profiles]=profileContent")
+        guard
+            let data = json["data"] as? [String: Any],
+            let attrs = data["attributes"] as? [String: Any],
+            let content = attrs["profileContent"] as? String,
+            let profileData = Data(base64Encoded: content)
+        else {
+            throw LaunchpadError.invalidResponse
+        }
+        return profileData
+    }
+
+    func deleteProfile(profileID: String) async throws {
+        try await delete("/profiles/\(profileID)")
+    }
+
     // MARK: - Provisioning — Certificates
 
     func listCertificates() async throws -> [[String: Any]] {
         let data = try await get("/certificates?fields[certificates]=name,certificateType,expirationDate,displayName")
         return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func revokeCertificate(certificateID: String) async throws {
+        try await delete("/certificates/\(certificateID)")
     }
 
     // MARK: - In-App Events

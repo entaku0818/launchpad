@@ -4,11 +4,18 @@ import Foundation
 struct IOSProvisioningCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "provisioning",
-        abstract: "Manage devices and certificates",
+        abstract: "Manage devices, certificates, bundle IDs, and profiles",
         subcommands: [
             IOSDevicesListCommand.self,
             IOSDevicesRegisterCommand.self,
             IOSCertsListCommand.self,
+            IOSCertsRevokeCommand.self,
+            IOSBundleIDsListCommand.self,
+            IOSBundleIDsRegisterCommand.self,
+            IOSBundleIDsDeleteCommand.self,
+            IOSProfilesListCommand.self,
+            IOSProfilesDownloadCommand.self,
+            IOSProfilesDeleteCommand.self,
         ]
     )
 }
@@ -91,11 +98,167 @@ struct IOSCertsListCommand: AsyncParsableCommand {
 
         Logger.info("\(certs.count) certificate(s)\n")
         for c in certs {
-            guard let attrs = c["attributes"] as? [String: Any] else { continue }
+            guard let id = c["id"] as? String,
+                  let attrs = c["attributes"] as? [String: Any] else { continue }
             let name    = attrs["displayName"] as? String ?? attrs["name"] as? String ?? "-"
             let type_   = attrs["certificateType"] as? String ?? "-"
             let expires = attrs["expirationDate"] as? String ?? "-"
-            print("  \(name)  [\(type_)]  expires: \(expires)")
+            print("  \(name)  [\(type_)]  expires: \(expires)  id: \(id)")
         }
+    }
+}
+
+// MARK: - certs revoke
+
+struct IOSCertsRevokeCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "revoke-cert",
+        abstract: "Revoke a certificate"
+    )
+
+    @Option(name: .long, help: "Certificate ID")
+    var certificateID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Revoking certificate \(certificateID)")
+        try await client.revokeCertificate(certificateID: certificateID)
+        Logger.success("Certificate revoked")
+    }
+}
+
+// MARK: - bundle IDs list
+
+struct IOSBundleIDsListCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "bundle-ids", abstract: "List registered bundle IDs")
+
+    @Option(name: .long, help: "Max number to show (default: 50)")
+    var limit: Int = 50
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching bundle IDs")
+        let ids = try await client.listBundleIDs(limit: limit)
+
+        if ids.isEmpty { Logger.info("No bundle IDs found"); return }
+        Logger.info("\(ids.count) bundle ID(s)\n")
+        for b in ids {
+            guard let id = b["id"] as? String,
+                  let attrs = b["attributes"] as? [String: Any] else { continue }
+            let identifier = attrs["identifier"] as? String ?? "-"
+            let name       = attrs["name"] as? String ?? "-"
+            let platform   = attrs["platform"] as? String ?? "-"
+            print("  \(identifier)  [\(platform)]  \(name)  id: \(id)")
+        }
+    }
+}
+
+// MARK: - bundle IDs register
+
+struct IOSBundleIDsRegisterCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "register-bundle-id", abstract: "Register a new bundle ID")
+
+    @Option(name: .long, help: "Bundle identifier (e.g. com.example.app)")
+    var identifier: String
+
+    @Option(name: .long, help: "Name for the bundle ID")
+    var name: String
+
+    @Option(name: .long, help: "Platform: IOS or MAC_OS (default: IOS)")
+    var platform: String = "IOS"
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Registering bundle ID '\(identifier)'")
+        let id = try await client.registerBundleID(identifier: identifier, name: name, platform: platform)
+        Logger.success("Bundle ID registered: \(id)")
+    }
+}
+
+// MARK: - bundle IDs delete
+
+struct IOSBundleIDsDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-bundle-id", abstract: "Delete a bundle ID")
+
+    @Option(name: .long, help: "Bundle ID resource ID (from bundle-ids list)")
+    var bundleIDResourceID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting bundle ID \(bundleIDResourceID)")
+        try await client.deleteBundleID(bundleIDResourceID: bundleIDResourceID)
+        Logger.success("Bundle ID deleted")
+    }
+}
+
+// MARK: - profiles list
+
+struct IOSProfilesListCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "profiles", abstract: "List provisioning profiles")
+
+    @Option(name: .long, help: "Max number to show (default: 50)")
+    var limit: Int = 50
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching provisioning profiles")
+        let profiles = try await client.listProfiles(limit: limit)
+
+        if profiles.isEmpty { Logger.info("No profiles found"); return }
+        Logger.info("\(profiles.count) profile(s)\n")
+        for p in profiles {
+            guard let id = p["id"] as? String,
+                  let attrs = p["attributes"] as? [String: Any] else { continue }
+            let name    = attrs["name"] as? String ?? "-"
+            let type_   = attrs["profileType"] as? String ?? "-"
+            let state   = attrs["profileState"] as? String ?? "-"
+            let expires = attrs["expirationDate"] as? String ?? "-"
+            print("  \(name)  [\(type_)]  state: \(state)  expires: \(expires)")
+            print("    id: \(id)")
+        }
+    }
+}
+
+// MARK: - profiles download
+
+struct IOSProfilesDownloadCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "download-profile", abstract: "Download a provisioning profile (.mobileprovision)")
+
+    @Option(name: .long, help: "Profile ID")
+    var profileID: String
+
+    @Option(name: .long, help: "Output file path (default: <profileID>.mobileprovision)")
+    var output: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let dest = output ?? "\(profileID).mobileprovision"
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Downloading profile \(profileID)")
+        let data = try await client.downloadProfile(profileID: profileID)
+        try data.write(to: URL(fileURLWithPath: dest))
+        Logger.success("Profile saved to \(dest)")
+    }
+}
+
+// MARK: - profiles delete
+
+struct IOSProfilesDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-profile", abstract: "Delete a provisioning profile")
+
+    @Option(name: .long, help: "Profile ID")
+    var profileID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting profile \(profileID)")
+        try await client.deleteProfile(profileID: profileID)
+        Logger.success("Profile deleted")
     }
 }

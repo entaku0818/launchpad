@@ -10,6 +10,8 @@ struct IOSBetaCommand: AsyncParsableCommand {
             IOSBetaTestersCommand.self,
             IOSBetaAddCommand.self,
             IOSBetaRemoveCommand.self,
+            IOSBetaCreateGroupCommand.self,
+            IOSBetaDeleteGroupCommand.self,
         ]
     )
 }
@@ -135,5 +137,58 @@ struct IOSBetaRemoveCommand: AsyncParsableCommand {
         Logger.step("Removing \(email) from group \(groupID)")
         try await client.removeBetaTester(email: email, groupID: groupID)
         Logger.success("Removed \(email)")
+    }
+}
+
+// MARK: - create-group
+
+struct IOSBetaCreateGroupCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "create-group",
+        abstract: "Create a new external beta group"
+    )
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    @Option(name: .long, help: "Group name")
+    var name: String
+
+    @Flag(name: .long, help: "Enable public link for the group")
+    var publicLink: Bool = false
+
+    @Flag(name: .long, help: "Enable tester feedback")
+    var feedback: Bool = false
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id required"); Foundation.exit(1) }()
+
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        Logger.step("Creating beta group '\(name)'")
+        let id = try await client.createBetaGroup(appID: appID, name: name, publicLinkEnabled: publicLink, feedbackEnabled: feedback)
+        Logger.success("Beta group created: \(id)")
+    }
+}
+
+// MARK: - delete-group
+
+struct IOSBetaDeleteGroupCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "delete-group",
+        abstract: "Delete a beta group"
+    )
+
+    @Option(name: .long, help: "Beta group ID")
+    var groupID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting beta group \(groupID)")
+        try await client.deleteBetaGroup(groupID: groupID)
+        Logger.success("Beta group deleted")
     }
 }
