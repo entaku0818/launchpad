@@ -1059,6 +1059,46 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Win-Back Offers
+
+    func listWinBackOffers(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/winBackOffers")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createWinBackOffer(subscriptionID: String, offerId: String, priority: String, customerEligibilityPaidSubscriptionDurationInMonths: Int, customerEligibilityTimeSinceLastSubscribedInMonths: Int, offerMode: String, duration: String, offerEligibility: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "winBackOffers",
+                "attributes": [
+                    "offerId": offerId,
+                    "priority": priority,
+                    "customerEligibility": [
+                        "paidSubscriptionDurationInMonths": customerEligibilityPaidSubscriptionDurationInMonths,
+                        "timeSinceLastSubscribedInMonths": ["minimum": customerEligibilityTimeSinceLastSubscribedInMonths],
+                    ],
+                    "offerMode": offerMode,
+                    "duration": duration,
+                    "offerEligibility": offerEligibility,
+                    "startDate": nil as Any?,
+                    "endDate": nil as Any?,
+                ] as [String: Any?],
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]]
+                ],
+            ] as [String: Any]
+        ]
+        let response = try await post("/winBackOffers", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteWinBackOffer(offerID: String) async throws {
+        try await delete("/winBackOffers/\(offerID)")
+    }
+
     // MARK: - Promo Codes
 
     func getPromoCodeOffers(appID: String) async throws -> [[String: Any]] {

@@ -50,6 +50,7 @@ struct IOSCommand: ParsableCommand {
             IOSReviewAttachmentsCommand.self,
             IOSAlternativeDistributionCommand.self,
             IOSBetaAppLocalizationsCommand.self,
+            IOSWinBackOffersCommand.self,
         ]
     )
 }
