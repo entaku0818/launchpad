@@ -445,6 +445,41 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func createCustomProductPage(appID: String, name: String, url: String?) async throws -> String {
+        var attrs: [String: Any] = ["name": name]
+        if let url { attrs["url"] = url }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appCustomProductPages",
+                "attributes": attrs,
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appCustomProductPages", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateCustomProductPageVisibility(pageID: String, visible: Bool) async throws {
+        let body: [String: Any] = [
+            "data": ["type": "appCustomProductPages", "id": pageID, "attributes": ["visible": visible]]
+        ]
+        _ = try await patch("/appCustomProductPages/\(pageID)", body: body)
+    }
+
+    func deleteCustomProductPage(pageID: String) async throws {
+        try await delete("/appCustomProductPages/\(pageID)")
+    }
+
+    func listCustomProductPageVersions(pageID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appCustomProductPages/\(pageID)/appCustomProductPageVersions")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Provisioning — Devices
 
     func listDevices(limit: Int = 50) async throws -> [[String: Any]] {
