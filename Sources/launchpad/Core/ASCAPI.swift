@@ -80,6 +80,60 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersionLocalizations/\(localizationID)", body: body)
     }
 
+    func createLocalization(versionID: String, locale: String, attributes: [String: Any]) async throws -> String {
+        var attrs = attributes
+        attrs["locale"] = locale
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appStoreVersionLocalizations", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteLocalization(localizationID: String) async throws {
+        try await delete("/appStoreVersionLocalizations/\(localizationID)")
+    }
+
+    // MARK: - Subscription Promotional Offers
+
+    func listPromotionalOffers(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/promotionalOffers")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createPromotionalOffer(subscriptionID: String, offerID: String, name: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionPromotionalOffers",
+                "attributes": [
+                    "offerId": offerID,
+                    "name": name,
+                ],
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/subscriptionPromotionalOffers", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deletePromotionalOffer(offerID: String) async throws {
+        try await delete("/subscriptionPromotionalOffers/\(offerID)")
+    }
+
     // MARK: - Screenshots
 
     func getScreenshotSets(localizationID: String) async throws -> [[String: Any]] {

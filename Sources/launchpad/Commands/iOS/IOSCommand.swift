@@ -52,6 +52,8 @@ struct IOSCommand: ParsableCommand {
             IOSBetaAppLocalizationsCommand.self,
             IOSWinBackOffersCommand.self,
             IOSRoutingCoverageCommand.self,
+            IOSLocalizationsCommand.self,
+            IOSPromotionalOffersCommand.self,
         ]
     )
 }
