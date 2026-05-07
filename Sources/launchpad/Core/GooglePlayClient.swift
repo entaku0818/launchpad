@@ -637,6 +637,35 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
+    // MARK: - Cancel Surveys
+
+    func listCancelSurveyResults(packageName: String, subscriptionID: String) async throws -> [[String: Any]] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/defer")!
+        // Cancel surveys are accessed via the monetization/subscriptions endpoint
+        let surveyURL = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptionsv2/tokens?subscriptionId=\(subscriptionID)&limit=100")!
+        _ = url // suppress unused warning
+        var req = URLRequest(url: surveyURL)
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["subscriptionPurchases"] as? [[String: Any]] ?? []
+    }
+
+    func getCancelSurvey(packageName: String, subscriptionID: String, token: String) async throws -> [String: Any] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptionsv2/tokens/\(token)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
     // MARK: - Purchase Verification
 
     func verifyProductPurchase(packageName: String, productID: String, token: String) async throws -> [String: Any] {

@@ -28,6 +28,7 @@ struct AndroidCommand: ParsableCommand {
             AndroidExpansionCommand.self,
             AndroidPurchasesCommand.self,
             AndroidApksCommand.self,
+            AndroidCancelSurveysCommand.self,
         ]
     )
 }
