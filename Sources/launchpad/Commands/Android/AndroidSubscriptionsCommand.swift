@@ -11,6 +11,8 @@ struct AndroidSubscriptionsCommand: AsyncParsableCommand {
             AndroidSubscriptionsActivateCommand.self,
             AndroidSubscriptionsDeactivateCommand.self,
             AndroidBasePlansListCommand.self,
+            AndroidSubscriptionsCreateCommand.self,
+            AndroidSubscriptionsDeleteCommand.self,
         ]
     )
 }
@@ -192,5 +194,58 @@ struct AndroidBasePlansListCommand: AsyncParsableCommand {
             let period = autoRenewingPlan?["billingPeriodDuration"] as? String ?? "-"
             print("  \(id)  state: \(state)  period: \(period)")
         }
+    }
+}
+
+struct AndroidSubscriptionsCreateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create", abstract: "Create a new subscription product")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product ID (SKU)")
+    var productID: String
+
+    @Option(name: .long, help: "Title (English)")
+    var title: String
+
+    @Option(name: .long, help: "Benefits description (English)")
+    var benefits: String = ""
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Creating subscription '\(productID)'")
+        try await client.createSubscription(
+            packageName: pkg,
+            productID: productID,
+            referenceName: title,
+            listings: ["en-US": ["title": title, "benefits": benefits]]
+        )
+        Logger.success("Subscription '\(productID)' created")
+    }
+}
+
+struct AndroidSubscriptionsDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete a subscription product")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product ID (SKU)")
+    var productID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting subscription '\(productID)'")
+        try await client.deleteSubscription(packageName: pkg, productID: productID)
+        Logger.success("Subscription '\(productID)' deleted")
     }
 }

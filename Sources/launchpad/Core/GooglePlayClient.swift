@@ -207,6 +207,39 @@ struct GooglePlayClient {
         return json
     }
 
+    func createSubscription(packageName: String, productID: String, referenceName: String, listings: [String: [String: String]]) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "productId": productID,
+            "packageName": packageName,
+            "listings": listings.mapValues { l -> [String: Any] in
+                ["title": l["title"] ?? "", "benefits": l["benefits"] ?? ""]
+            }
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func deleteSubscription(packageName: String, productID: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func listBasePlans(packageName: String, productID: String) async throws -> [[String: Any]] {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans")!

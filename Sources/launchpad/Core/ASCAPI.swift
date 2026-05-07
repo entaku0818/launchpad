@@ -910,6 +910,18 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Sales Reports
+
+    func downloadSalesReport(vendorNumber: String, reportType: String, reportSubType: String, frequency: String, reportDate: String) async throws -> String {
+        let path = "/salesReports?filter[frequency]=\(frequency)&filter[reportDate]=\(reportDate)&filter[reportSubType]=\(reportSubType)&filter[reportType]=\(reportType)&filter[vendorNumber]=\(vendorNumber)"
+        let url = URL(string: baseURL + path)!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(try credentials.generateJWT())", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkStatus(response, data)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
     // MARK: - Finance Reports
 
     func downloadFinanceReport(vendorNumber: String, reportDate: String, regionCode: String = "ZZ") async throws -> String {
