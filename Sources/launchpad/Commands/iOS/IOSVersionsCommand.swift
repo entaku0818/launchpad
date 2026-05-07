@@ -8,6 +8,7 @@ struct IOSVersionsCommand: AsyncParsableCommand {
         subcommands: [
             IOSVersionsListCommand.self,
             IOSVersionsCreateCommand.self,
+            IOSVersionsReleaseCommand.self,
         ]
     )
 }
@@ -63,5 +64,20 @@ struct IOSVersionsCreateCommand: AsyncParsableCommand {
         let versionID = try await client.createAppStoreVersion(appID: appID, versionString: version, platform: platform)
         Logger.success("Version \(version) created  id: \(versionID)")
         Logger.info("Next: add metadata, screenshots, then submit for review")
+    }
+}
+
+struct IOSVersionsReleaseCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "release", abstract: "Release a manually-held version that has passed App Store review")
+
+    @Option(name: .long, help: "App Store version ID (from ios versions list)")
+    var versionID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Requesting release for version \(versionID)")
+        let requestID = try await client.requestVersionRelease(versionID: versionID)
+        Logger.success("Release request submitted: \(requestID)")
     }
 }

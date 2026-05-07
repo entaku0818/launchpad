@@ -408,6 +408,38 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
+    func deleteImage(packageName: String, language: String, imageType: String, imageID: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(language)/images/\(imageType)/\(imageID)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
+    func deleteAllImages(packageName: String, language: String, imageType: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(language)/images/\(imageType)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
     // MARK: - Subscription Offers
 
     func listSubscriptionOffers(packageName: String, productID: String, basePlanID: String) async throws -> [[String: Any]] {

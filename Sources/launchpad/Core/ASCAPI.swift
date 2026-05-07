@@ -528,6 +528,94 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)", body: body)
     }
 
+    // MARK: - Version Release Request (manual hold release)
+
+    func requestVersionRelease(versionID: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionReleaseRequests",
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appStoreVersionReleaseRequests", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    // MARK: - Subscription Introductory Offers
+
+    func listIntroductoryOffers(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/introductoryOffers")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createIntroductoryOffer(subscriptionID: String, duration: String, offerMode: String, numberOfPeriods: Int, territory: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionIntroductoryOffers",
+                "attributes": [
+                    "duration": duration,
+                    "offerMode": offerMode,
+                    "numberOfPeriods": numberOfPeriods,
+                ],
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]],
+                    "territory": ["data": ["type": "territories", "id": territory]],
+                ],
+            ]
+        ]
+        let response = try await post("/subscriptionIntroductoryOffers", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteIntroductoryOffer(offerID: String) async throws {
+        try await delete("/subscriptionIntroductoryOffers/\(offerID)")
+    }
+
+    // MARK: - Custom Product Page Localizations
+
+    func listCustomProductPageLocalizations(pageVersionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appCustomProductPageVersions/\(pageVersionID)/appCustomProductPageLocalizations")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createCustomProductPageLocalization(pageVersionID: String, locale: String, promotionalText: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale]
+        if let text = promotionalText { attrs["promotionalText"] = text }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appCustomProductPageLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "appCustomProductPageVersion": ["data": ["type": "appCustomProductPageVersions", "id": pageVersionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appCustomProductPageLocalizations", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateCustomProductPageLocalization(localizationID: String, promotionalText: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appCustomProductPageLocalizations",
+                "id": localizationID,
+                "attributes": ["promotionalText": promotionalText],
+            ]
+        ]
+        _ = try await patch("/appCustomProductPageLocalizations/\(localizationID)", body: body)
+    }
+
     // MARK: - Customer Reviews
 
     func getCustomerReviews(appID: String, limit: Int = 20) async throws -> [[String: Any]] {

@@ -8,6 +8,8 @@ struct AndroidImagesCommand: AsyncParsableCommand {
         subcommands: [
             AndroidImagesListCommand.self,
             AndroidImagesUploadCommand.self,
+            AndroidImagesDeleteCommand.self,
+            AndroidImagesDeleteAllCommand.self,
         ]
     )
 }
@@ -73,5 +75,56 @@ struct AndroidImagesUploadCommand: AsyncParsableCommand {
         Logger.step("Uploading \(imageType) for \(pkg) [\(language)]")
         try await client.uploadImage(packageName: pkg, language: language, imageType: imageType, imagePath: image)
         Logger.success("Image uploaded and published")
+    }
+}
+
+struct AndroidImagesDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete a specific image by ID")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Language code (e.g. en-US)")
+    var language: String = "en-US"
+
+    @Option(name: .long, help: "Image type (e.g. featureGraphic)")
+    var imageType: String
+
+    @Option(name: .long, help: "Image ID (from images list)")
+    var imageID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting image \(imageID) (\(imageType)) for [\(language)]")
+        try await client.deleteImage(packageName: pkg, language: language, imageType: imageType, imageID: imageID)
+        Logger.success("Image deleted")
+    }
+}
+
+struct AndroidImagesDeleteAllCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-all", abstract: "Delete all images of a given type for a locale")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Language code (e.g. en-US)")
+    var language: String = "en-US"
+
+    @Option(name: .long, help: "Image type (e.g. featureGraphic, phoneScreenshots)")
+    var imageType: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting all \(imageType) images for [\(language)]")
+        try await client.deleteAllImages(packageName: pkg, language: language, imageType: imageType)
+        Logger.success("All \(imageType) images deleted")
     }
 }

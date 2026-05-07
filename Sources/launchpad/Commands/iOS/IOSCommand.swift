@@ -56,6 +56,8 @@ struct IOSCommand: ParsableCommand {
             IOSPromotionalOffersCommand.self,
             IOSSubscriptionImagesCommand.self,
             IOSSubscriptionLocalizationsCommand.self,
+            IOSIntroductoryOffersCommand.self,
+            IOSCustomPageLocalizationsCommand.self,
         ]
     )
 }
