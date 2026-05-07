@@ -9,6 +9,8 @@ struct IOSTeamCommand: AsyncParsableCommand {
             IOSTeamListCommand.self,
             IOSTeamInviteCommand.self,
             IOSTeamRemoveCommand.self,
+            IOSTeamInvitationsListCommand.self,
+            IOSTeamInvitationsCancelCommand.self,
         ]
     )
 }
@@ -76,5 +78,45 @@ struct IOSTeamRemoveCommand: AsyncParsableCommand {
         Logger.step("Removing user \(userID)")
         try await client.removeUser(userID: userID)
         Logger.success("User removed")
+    }
+}
+
+struct IOSTeamInvitationsListCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "invitations", abstract: "List pending user invitations")
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching pending invitations")
+        let invitations = try await client.listUserInvitations()
+
+        if invitations.isEmpty { Logger.info("No pending invitations"); return }
+        Logger.info("\(invitations.count) invitation(s)\n")
+        for inv in invitations {
+            guard let id = inv["id"] as? String,
+                  let attrs = inv["attributes"] as? [String: Any] else { continue }
+            let email   = attrs["email"] as? String ?? "-"
+            let first   = attrs["firstName"] as? String ?? ""
+            let last    = attrs["lastName"] as? String ?? ""
+            let roles   = (attrs["roles"] as? [String] ?? []).joined(separator: ", ")
+            let expires = attrs["expirationDate"] as? String ?? "-"
+            print("  \(first) \(last)  <\(email)>")
+            print("    roles: \(roles)  expires: \(expires)  id: \(id)\n")
+        }
+    }
+}
+
+struct IOSTeamInvitationsCancelCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "cancel-invitation", abstract: "Cancel a pending invitation")
+
+    @Option(name: .long, help: "Invitation ID (from team invitations)")
+    var invitationID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Cancelling invitation \(invitationID)")
+        try await client.cancelUserInvitation(invitationID: invitationID)
+        Logger.success("Invitation cancelled")
     }
 }

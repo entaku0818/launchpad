@@ -660,6 +660,15 @@ struct ASCAPIClient {
         try await delete("/users/\(userID)")
     }
 
+    func listUserInvitations() async throws -> [[String: Any]] {
+        let data = try await get("/userInvitations?fields[userInvitations]=email,firstName,lastName,roles,expirationDate&limit=50")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func cancelUserInvitation(invitationID: String) async throws {
+        try await delete("/userInvitations/\(invitationID)")
+    }
+
     // MARK: - TestFlight Build Localizations
 
     func getBuildLocalizations(buildID: String) async throws -> [[String: Any]] {
