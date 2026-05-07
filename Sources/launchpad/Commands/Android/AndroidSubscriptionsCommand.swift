@@ -10,6 +10,7 @@ struct AndroidSubscriptionsCommand: AsyncParsableCommand {
             AndroidSubscriptionsGetCommand.self,
             AndroidSubscriptionsActivateCommand.self,
             AndroidSubscriptionsDeactivateCommand.self,
+            AndroidBasePlansListCommand.self,
         ]
     )
 }
@@ -161,5 +162,35 @@ struct AndroidSubscriptionsDeactivateCommand: AsyncParsableCommand {
         Logger.step("Deactivating \(productID)/\(basePlanID)")
         try await client.deactivateBasePlan(packageName: pkg, productID: productID, basePlanID: basePlanID)
         Logger.success("Base plan \(basePlanID) deactivated")
+    }
+}
+
+struct AndroidBasePlansListCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "base-plans", abstract: "List base plans for a subscription")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var productID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Fetching base plans for \(productID)")
+        let plans = try await client.listBasePlans(packageName: pkg, productID: productID)
+
+        if plans.isEmpty { Logger.info("No base plans found"); return }
+        Logger.info("\(plans.count) base plan(s)\n")
+        for p in plans {
+            let id     = p["basePlanId"] as? String ?? "-"
+            let state  = p["state"] as? String ?? "-"
+            let autoRenewingPlan = p["autoRenewingBasePlanType"] as? [String: Any]
+            let period = autoRenewingPlan?["billingPeriodDuration"] as? String ?? "-"
+            print("  \(id)  state: \(state)  period: \(period)")
+        }
     }
 }

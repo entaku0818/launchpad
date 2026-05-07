@@ -10,6 +10,8 @@ struct IOSBuildsCommand: AsyncParsableCommand {
             IOSBuildsGetCommand.self,
             IOSBuildsNotesCommand.self,
             IOSBuildsReviewCommand.self,
+            IOSBuildsAssignGroupsCommand.self,
+            IOSBuildsRemoveGroupsCommand.self,
         ]
     )
 }
@@ -151,5 +153,43 @@ struct IOSBuildsGetCommand: AsyncParsableCommand {
         print("processingState:  \(state)")
         print("uploadedDate:     \(uploaded)")
         print("minOsVersion:     \(minOS)")
+    }
+}
+
+struct IOSBuildsAssignGroupsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "assign-groups", abstract: "Add a build to one or more beta groups")
+
+    @Option(name: .long, help: "Build ID")
+    var buildID: String
+
+    @Option(name: .long, help: "Comma-separated beta group IDs")
+    var groupIDs: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let ids = groupIDs.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Assigning build \(buildID) to \(ids.count) group(s)")
+        try await client.assignBuildToBetaGroups(buildID: buildID, groupIDs: ids)
+        Logger.success("Build assigned to beta groups")
+    }
+}
+
+struct IOSBuildsRemoveGroupsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "remove-groups", abstract: "Remove a build from one or more beta groups")
+
+    @Option(name: .long, help: "Build ID")
+    var buildID: String
+
+    @Option(name: .long, help: "Comma-separated beta group IDs")
+    var groupIDs: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let ids = groupIDs.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Removing build \(buildID) from \(ids.count) group(s)")
+        try await client.removeBuildFromBetaGroups(buildID: buildID, groupIDs: ids)
+        Logger.success("Build removed from beta groups")
     }
 }

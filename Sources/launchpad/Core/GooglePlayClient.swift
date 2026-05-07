@@ -207,6 +207,18 @@ struct GooglePlayClient {
         return json
     }
 
+    func listBasePlans(packageName: String, productID: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["basePlans"] as? [[String: Any]] ?? []
+    }
+
     func activateBasePlan(packageName: String, productID: String, basePlanID: String) async throws {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID):activate")!

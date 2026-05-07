@@ -550,6 +550,20 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Build Beta Group Assignment
+
+    func assignBuildToBetaGroups(buildID: String, groupIDs: [String]) async throws {
+        let items = groupIDs.map { id -> [String: Any] in ["type": "betaGroups", "id": id] }
+        let body: [String: Any] = ["data": items]
+        _ = try await post("/builds/\(buildID)/relationships/betaGroups", body: body)
+    }
+
+    func removeBuildFromBetaGroups(buildID: String, groupIDs: [String]) async throws {
+        let items = groupIDs.map { id -> [String: Any] in ["type": "betaGroups", "id": id] }
+        let body: [String: Any] = ["data": items]
+        try await delete("/builds/\(buildID)/relationships/betaGroups", body: body)
+    }
+
     // MARK: - Beta License Agreements
 
     func getBetaLicenseAgreements(appID: String) async throws -> [String: Any] {
