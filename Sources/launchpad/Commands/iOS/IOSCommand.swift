@@ -63,6 +63,9 @@ struct IOSCommand: ParsableCommand {
             IOSPreviewSetsCommand.self,
             IOSSubscriptionGroupLocalizationsCommand.self,
             IOSBuildBetaDetailCommand.self,
+            IOSAppScreenshotsCommand.self,
+            IOSIAPPriceScheduleCommand.self,
+            IOSEventLocalizationsCommand.self,
         ]
     )
 }

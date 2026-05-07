@@ -543,12 +543,92 @@ struct ASCAPIClient {
         return data["data"] as? [String: Any] ?? [:]
     }
 
+    func createAppEvent(appID: String, referenceName: String, badge: String, startDate: String, endDate: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appEvents",
+                "attributes": [
+                    "referenceName": referenceName,
+                    "badge": badge,
+                    "startDate": startDate,
+                    "endDate": endDate,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appEvents", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateAppEvent(eventID: String, referenceName: String?, badge: String?, startDate: String?, endDate: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let referenceName { attrs["referenceName"] = referenceName }
+        if let badge { attrs["badge"] = badge }
+        if let startDate { attrs["startDate"] = startDate }
+        if let endDate { attrs["endDate"] = endDate }
+        let body: [String: Any] = [
+            "data": ["type": "appEvents", "id": eventID, "attributes": attrs]
+        ]
+        _ = try await patch("/appEvents/\(eventID)", body: body)
+    }
+
+    func deleteAppEvent(eventID: String) async throws {
+        try await delete("/appEvents/\(eventID)")
+    }
+
     func publishAppEvent(eventID: String) async throws {
         _ = try await post("/appEvents/\(eventID)/publish", body: [:])
     }
 
     func unpublishAppEvent(eventID: String) async throws {
         _ = try await post("/appEvents/\(eventID)/unpublish", body: [:])
+    }
+
+    // MARK: - App Event Localizations
+
+    func listAppEventLocalizations(eventID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appEvents/\(eventID)/localizations")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createAppEventLocalization(eventID: String, locale: String, name: String, shortDescription: String?, longDescription: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale, "name": name]
+        if let shortDescription { attrs["shortDescription"] = shortDescription }
+        if let longDescription { attrs["longDescription"] = longDescription }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appEventLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "appEvent": ["data": ["type": "appEvents", "id": eventID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appEventLocalizations", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateAppEventLocalization(localizationID: String, name: String?, shortDescription: String?, longDescription: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let name { attrs["name"] = name }
+        if let shortDescription { attrs["shortDescription"] = shortDescription }
+        if let longDescription { attrs["longDescription"] = longDescription }
+        let body: [String: Any] = [
+            "data": ["type": "appEventLocalizations", "id": localizationID, "attributes": attrs]
+        ]
+        _ = try await patch("/appEventLocalizations/\(localizationID)", body: body)
+    }
+
+    func deleteAppEventLocalization(localizationID: String) async throws {
+        try await delete("/appEventLocalizations/\(localizationID)")
     }
 
     // MARK: - Phased Release
@@ -1419,6 +1499,41 @@ struct ASCAPIClient {
 
     func deleteInAppPurchase(iapID: String) async throws {
         try await delete("/inAppPurchasesV2/\(iapID)")
+    }
+
+    // MARK: - IAP Price Schedules
+
+    func getIAPPriceSchedule(iapID: String) async throws -> [String: Any] {
+        let data = try await get("/inAppPurchasesV2/\(iapID)/iapPriceSchedule?include=manualPrices,baseTerritory")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func listIAPPrices(iapID: String) async throws -> [[String: Any]] {
+        let data = try await get("/inAppPurchasesV2/\(iapID)/iapPriceSchedule?include=manualPrices")
+        guard let included = data["included"] as? [[String: Any]] else { return [] }
+        return included.filter { $0["type"] as? String == "iapPrices" }
+    }
+
+    func setIAPPriceSchedule(iapID: String, pricePointID: String, startDate: String?) async throws {
+        var manualPriceAttrs: [String: Any] = [:]
+        if let startDate { manualPriceAttrs["startDate"] = startDate }
+        let manualPrice: [String: Any] = [
+            "type": "iapPrices",
+            "attributes": manualPriceAttrs,
+            "relationships": [
+                "iapPricePoint": ["data": ["type": "iapPricePoints", "id": pricePointID]]
+            ]
+        ]
+        let body: [String: Any] = [
+            "data": [
+                "type": "iapPriceSchedules",
+                "relationships": [
+                    "inAppPurchase": ["data": ["type": "inAppPurchases", "id": iapID]],
+                    "manualPrices": ["data": [manualPrice]]
+                ]
+            ]
+        ]
+        _ = try await post("/iapPriceSchedules", body: body)
     }
 
     // MARK: - Subscription Localizations
