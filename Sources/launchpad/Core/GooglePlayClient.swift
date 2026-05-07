@@ -610,6 +610,18 @@ struct GooglePlayClient {
         }
     }
 
+    func listDeobfuscationFiles(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/deobfuscationfiles/\(versionCode)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["deobfuscationFiles"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Track management
 
     func promoteTrack(packageName: String, from: String, to: String) async throws {
