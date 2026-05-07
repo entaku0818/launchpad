@@ -74,6 +74,7 @@ struct IOSCommand: ParsableCommand {
             IOSServerAPICommand.self,
             IOSSearchAdsCommand.self,
             IOSASOCommand.self,
+            IOSVersionBumpCommand.self,
         ]
     )
 }

@@ -41,6 +41,7 @@ struct AndroidCommand: ParsableCommand {
             AndroidBundleListingsCommand.self,
             AndroidVitalsCommand.self,
             AndroidASOCommand.self,
+            AndroidVersionBumpCommand.self,
         ]
     )
 }
