@@ -710,6 +710,16 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - App Availability
+
+    func setAvailableTerritories(appID: String, territoryCodes: [String]) async throws {
+        let items = territoryCodes.map { code -> [String: Any] in
+            ["type": "territories", "id": code]
+        }
+        let body: [String: Any] = ["data": items]
+        _ = try await patch("/apps/\(appID)/relationships/availableTerritories", body: body)
+    }
+
     // MARK: - Price Points
 
     func listPricePoints(appID: String, territory: String? = nil) async throws -> [[String: Any]] {

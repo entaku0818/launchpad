@@ -37,6 +37,7 @@ struct IOSCommand: ParsableCommand {
             IOSEULACommand.self,
             IOSAPIKeysCommand.self,
             IOSPricePointsCommand.self,
+            IOSAvailabilityCommand.self,
         ]
     )
 }
