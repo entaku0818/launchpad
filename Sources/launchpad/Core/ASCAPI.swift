@@ -187,6 +187,142 @@ struct ASCAPIClient {
         _ = try await patch("/appScreenshots/\(id)", body: body)
     }
 
+    // MARK: - Preview Sets
+
+    func getPreviewSets(localizationID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appStoreVersionLocalizations/\(localizationID)/appPreviewSets")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func getPreviews(setID: String) async throws -> [[String: Any]] {
+        let data = try await get("/appPreviewSets/\(setID)/appPreviews")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func reservePreview(setID: String, fileName: String, fileSize: Int) async throws -> (id: String, uploadURL: String) {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreviews",
+                "attributes": ["fileName": fileName, "fileSize": fileSize],
+                "relationships": [
+                    "appPreviewSet": ["data": ["type": "appPreviewSets", "id": setID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appPreviews", body: body)
+        guard
+            let dataDict = response["data"] as? [String: Any],
+            let id = dataDict["id"] as? String,
+            let attrs = dataDict["attributes"] as? [String: Any],
+            let ops = attrs["uploadOperations"] as? [[String: Any]],
+            let url = ops.first?["url"] as? String
+        else {
+            throw LaunchpadError.invalidResponse
+        }
+        return (id, url)
+    }
+
+    func commitPreview(id: String, md5: String, fileSize: Int) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreviews",
+                "id": id,
+                "attributes": ["uploaded": true, "sourceFileChecksum": md5],
+            ]
+        ]
+        _ = try await patch("/appPreviews/\(id)", body: body)
+    }
+
+    func deletePreview(id: String) async throws {
+        try await delete("/appPreviews/\(id)")
+    }
+
+    func createPreviewSet(localizationID: String, previewType: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreviewSets",
+                "attributes": ["previewType": previewType],
+                "relationships": [
+                    "appStoreVersionLocalization": ["data": ["type": "appStoreVersionLocalizations", "id": localizationID]]
+                ],
+            ]
+        ]
+        let response = try await post("/appPreviewSets", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deletePreviewSet(setID: String) async throws {
+        try await delete("/appPreviewSets/\(setID)")
+    }
+
+    // MARK: - Subscription Group Localizations
+
+    func listSubscriptionGroupLocalizations(groupID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptionGroups/\(groupID)/subscriptionGroupLocalizations")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscriptionGroupLocalization(groupID: String, locale: String, name: String, customAppName: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale, "name": name]
+        if let customAppName { attrs["customAppName"] = customAppName }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionGroupLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "subscriptionGroup": ["data": ["type": "subscriptionGroups", "id": groupID]]
+                ],
+            ]
+        ]
+        let response = try await post("/subscriptionGroupLocalizations", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateSubscriptionGroupLocalization(localizationID: String, name: String?, customAppName: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let name { attrs["name"] = name }
+        if let customAppName { attrs["customAppName"] = customAppName }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionGroupLocalizations",
+                "id": localizationID,
+                "attributes": attrs,
+            ]
+        ]
+        _ = try await patch("/subscriptionGroupLocalizations/\(localizationID)", body: body)
+    }
+
+    func deleteSubscriptionGroupLocalization(localizationID: String) async throws {
+        try await delete("/subscriptionGroupLocalizations/\(localizationID)")
+    }
+
+    // MARK: - Build Beta Details
+
+    func getBuildBetaDetail(buildID: String) async throws -> [String: Any] {
+        let data = try await get("/builds/\(buildID)/buildBetaDetail")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func updateBuildBetaDetail(detailID: String, whatsNew: String?, autoNotifyEnabled: Bool?) async throws {
+        var attrs: [String: Any] = [:]
+        if let whatsNew { attrs["whatsNew"] = whatsNew }
+        if let autoNotifyEnabled { attrs["autoNotifyEnabled"] = autoNotifyEnabled }
+        let body: [String: Any] = [
+            "data": [
+                "type": "buildBetaDetails",
+                "id": detailID,
+                "attributes": attrs,
+            ]
+        ]
+        _ = try await patch("/buildBetaDetails/\(detailID)", body: body)
+    }
+
     // MARK: - TestFlight Beta
 
     func getBetaGroups(appID: String) async throws -> [[String: Any]] {
@@ -253,54 +389,6 @@ struct ASCAPIClient {
 
         let body: [String: Any] = ["data": [["type": "betaTesters", "id": testerID]]]
         _ = try await delete("/betaGroups/\(groupID)/relationships/betaTesters", body: body)
-    }
-
-    // MARK: - App Preview Videos
-
-    func getPreviewSets(localizationID: String) async throws -> [[String: Any]] {
-        let data = try await get("/appStoreVersionLocalizations/\(localizationID)/appPreviewSets")
-        return data["data"] as? [[String: Any]] ?? []
-    }
-
-    func getPreviews(setID: String) async throws -> [[String: Any]] {
-        let data = try await get("/appPreviewSets/\(setID)/appPreviews")
-        return data["data"] as? [[String: Any]] ?? []
-    }
-
-    func deletePreview(id: String) async throws {
-        try await delete("/appPreviews/\(id)")
-    }
-
-    func reservePreview(setID: String, fileName: String, fileSize: Int) async throws -> (id: String, uploadURL: String) {
-        let body: [String: Any] = [
-            "data": [
-                "type": "appPreviews",
-                "attributes": ["fileName": fileName, "fileSize": fileSize],
-                "relationships": [
-                    "appPreviewSet": ["data": ["type": "appPreviewSets", "id": setID]]
-                ],
-            ]
-        ]
-        let response = try await post("/appPreviews", body: body)
-        guard
-            let d = response["data"] as? [String: Any],
-            let id = d["id"] as? String,
-            let attrs = d["attributes"] as? [String: Any],
-            let ops = attrs["uploadOperations"] as? [[String: Any]],
-            let url = ops.first?["url"] as? String
-        else { throw LaunchpadError.invalidResponse }
-        return (id, url)
-    }
-
-    func commitPreview(id: String, md5: String, fileSize: Int) async throws {
-        let body: [String: Any] = [
-            "data": [
-                "type": "appPreviews",
-                "id": id,
-                "attributes": ["uploaded": true, "sourceFileChecksum": md5],
-            ]
-        ]
-        _ = try await patch("/appPreviews/\(id)", body: body)
     }
 
     // MARK: - Pricing & Territory
