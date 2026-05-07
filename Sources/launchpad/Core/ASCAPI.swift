@@ -173,6 +173,13 @@ struct ASCAPIClient {
         return (id, url)
     }
 
+    func reorderScreenshot(id: String, displayOrder: Int) async throws {
+        let body: [String: Any] = [
+            "data": ["type": "appScreenshots", "id": id, "attributes": ["displayOrder": displayOrder]]
+        ]
+        _ = try await patch("/appScreenshots/\(id)", body: body)
+    }
+
     func commitScreenshot(id: String, md5: String, fileSize: Int) async throws {
         let body: [String: Any] = [
             "data": [
@@ -1785,6 +1792,34 @@ struct ASCAPIClient {
     func getSubscriptions(groupID: String) async throws -> [[String: Any]] {
         let data = try await get("/subscriptionGroups/\(groupID)/subscriptions?fields[subscriptions]=productID,name,state,subscriptionPeriod,reviewNote")
         return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscription(groupID: String, productID: String, name: String, period: String, reviewNote: String?) async throws -> String {
+        var attrs: [String: Any] = [
+            "productID": productID,
+            "name": name,
+            "subscriptionPeriod": period,
+            "familySharable": false,
+        ]
+        if let reviewNote { attrs["reviewNote"] = reviewNote }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptions",
+                "attributes": attrs,
+                "relationships": [
+                    "group": ["data": ["type": "subscriptionGroups", "id": groupID]]
+                ]
+            ]
+        ]
+        let json = try await post("/subscriptions", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteSubscription(subscriptionID: String) async throws {
+        try await delete("/subscriptions/\(subscriptionID)")
     }
 
     // MARK: - Win-Back Offers

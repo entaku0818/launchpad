@@ -9,6 +9,7 @@ struct IOSAppScreenshotsCommand: ParsableCommand {
         subcommands: [
             IOSAppScreenshotsListCommand.self,
             IOSAppScreenshotsUploadCommand.self,
+            IOSAppScreenshotsOrderCommand.self,
             IOSAppScreenshotsDeleteCommand.self,
         ]
     )
@@ -70,6 +71,24 @@ struct IOSAppScreenshotsUploadCommand: AsyncParsableCommand {
         Logger.info("Committing upload...")
         try await client.commitScreenshot(id: screenshotID, md5: md5, fileSize: imageData.count)
         Logger.success("Screenshot uploaded: \(fileName)  id: \(screenshotID)")
+    }
+}
+
+struct IOSAppScreenshotsOrderCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "order", abstract: "Set the display order of a screenshot within its set")
+
+    @Option(name: .long, help: "Screenshot ID (from list)")
+    var screenshotID: String
+
+    @Option(name: .long, help: "Display position (0-based)")
+    var position: Int
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Setting screenshot \(screenshotID) to position \(position)")
+        try await client.reorderScreenshot(id: screenshotID, displayOrder: position)
+        Logger.success("Screenshot order updated")
     }
 }
 

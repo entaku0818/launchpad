@@ -13,6 +13,7 @@ struct AndroidIAPCommand: AsyncParsableCommand {
             AndroidIAPCreateCommand.self,
             AndroidIAPDeleteCommand.self,
             AndroidIAPUpdatePriceCommand.self,
+            AndroidIAPUpdateListingCommand.self,
         ]
     )
 }
@@ -218,6 +219,36 @@ struct AndroidIAPDeleteCommand: AsyncParsableCommand {
         Logger.step("Deleting IAP product '\(sku)'")
         try await client.deleteIAP(packageName: pkg, sku: sku)
         Logger.success("IAP product '\(sku)' deleted")
+    }
+}
+
+struct AndroidIAPUpdateListingCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "update-listing", abstract: "Update the title and description for an in-app product locale")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product SKU")
+    var sku: String
+
+    @Option(name: .long, help: "Language code (e.g. en-US, ja-JP)")
+    var language: String = "en-US"
+
+    @Option(name: .long, help: "Display title")
+    var title: String
+
+    @Option(name: .long, help: "Description shown in the store")
+    var description: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Updating listing for \(sku) [\(language)]")
+        try await client.updateIAPListing(packageName: pkg, sku: sku, language: language, title: title, description: description)
+        Logger.success("IAP listing updated for \(sku) [\(language)]")
     }
 }
 

@@ -10,6 +10,8 @@ struct IOSSubscriptionGroupsCommand: AsyncParsableCommand {
             IOSSubscriptionGroupsProductsCommand.self,
             IOSSubscriptionGroupsCreateCommand.self,
             IOSSubscriptionGroupsDeleteCommand.self,
+            IOSSubscriptionCreateCommand.self,
+            IOSSubscriptionDeleteCommand.self,
         ]
     )
 }
@@ -99,5 +101,48 @@ struct IOSSubscriptionGroupsDeleteCommand: AsyncParsableCommand {
         Logger.step("Deleting subscription group \(groupID)")
         try await client.deleteSubscriptionGroup(groupID: groupID)
         Logger.success("Subscription group deleted")
+    }
+}
+
+struct IOSSubscriptionCreateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create-subscription", abstract: "Create a subscription product within a group")
+
+    @Option(name: .long, help: "Subscription group ID (from list)")
+    var groupID: String
+
+    @Option(name: .long, help: "Product ID (e.g. com.example.monthly)")
+    var productID: String
+
+    @Option(name: .long, help: "Reference name (internal identifier)")
+    var name: String
+
+    @Option(name: .long, help: "Billing period: P1W, P1M, P2M, P3M, P6M, P1Y")
+    var period: String
+
+    @Option(name: .long, help: "Note for App Review (optional)")
+    var reviewNote: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Creating subscription '\(productID)' in group \(groupID)")
+        let id = try await client.createSubscription(groupID: groupID, productID: productID, name: name, period: period, reviewNote: reviewNote)
+        Logger.success("Subscription created: \(id)")
+        Logger.info("Next: add localizations, set prices, configure availability")
+    }
+}
+
+struct IOSSubscriptionDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-subscription", abstract: "Delete a subscription product")
+
+    @Option(name: .long, help: "Subscription ID (from products list)")
+    var subscriptionID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting subscription \(subscriptionID)")
+        try await client.deleteSubscription(subscriptionID: subscriptionID)
+        Logger.success("Subscription deleted")
     }
 }

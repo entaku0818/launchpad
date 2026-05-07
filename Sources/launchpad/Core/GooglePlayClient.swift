@@ -433,6 +433,23 @@ struct GooglePlayClient {
         }
     }
 
+    func updateIAPListing(packageName: String, sku: String, language: String, title: String, description: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts/\(sku)?updateMask=listings")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "listings": [language: ["title": title, "description": description]]
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func deleteIAP(packageName: String, sku: String) async throws {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts/\(sku)")!
