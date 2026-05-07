@@ -30,6 +30,7 @@ struct AndroidCommand: ParsableCommand {
             AndroidApksCommand.self,
             AndroidCancelSurveysCommand.self,
             AndroidTracksCommand.self,
+            AndroidGeneratedApksCommand.self,
         ]
     )
 }

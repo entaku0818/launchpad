@@ -440,6 +440,32 @@ struct GooglePlayClient {
         return json["bundles"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Generated APKs
+
+    func listGeneratedApks(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/generatedApks/\(versionCode)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["generatedApks"] as? [[String: Any]] ?? []
+    }
+
+    func downloadGeneratedApk(packageName: String, versionCode: Int, downloadID: String, destination: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/generatedApks/\(versionCode)/downloads/\(downloadID):download?alt=media")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try data.write(to: URL(fileURLWithPath: destination))
+    }
+
     // MARK: - Tracks
 
     func listTracks(packageName: String) async throws -> [[String: Any]] {
