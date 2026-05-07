@@ -8,6 +8,7 @@ struct IOSPricingCommand: AsyncParsableCommand {
         subcommands: [
             IOSPricingShowCommand.self,
             IOSPricingTerritoriesCommand.self,
+            IOSPricingSetCommand.self,
         ]
     )
 }
@@ -85,6 +86,36 @@ struct IOSPricingTerritoriesCommand: AsyncParsableCommand {
         let codes = territories.compactMap { ($0["id"] as? String) }
         let joined = codes.chunks(ofCount: 10).map { $0.joined(separator: "  ") }.joined(separator: "\n")
         print(joined)
+    }
+}
+
+// MARK: - set
+
+struct IOSPricingSetCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "set",
+        abstract: "Set the app price using a price point ID"
+    )
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    @Option(name: .long, help: "Price point ID (from ios price-points list)")
+    var pricePointID: String
+
+    @Option(name: .long, help: "Effective start date (YYYY-MM-DD). Omit for immediate.")
+    var startDate: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id required"); Foundation.exit(1) }()
+
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        Logger.step("Setting price to point \(pricePointID) for \(bid)")
+        try await client.setAppPriceSchedule(appID: appID, pricePointID: pricePointID, startDate: startDate)
+        Logger.success("Price updated")
     }
 }
 

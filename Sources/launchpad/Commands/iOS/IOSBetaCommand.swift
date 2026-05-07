@@ -12,6 +12,7 @@ struct IOSBetaCommand: AsyncParsableCommand {
             IOSBetaRemoveCommand.self,
             IOSBetaCreateGroupCommand.self,
             IOSBetaDeleteGroupCommand.self,
+            IOSBetaUpdateGroupCommand.self,
         ]
     )
 }
@@ -190,5 +191,33 @@ struct IOSBetaDeleteGroupCommand: AsyncParsableCommand {
         Logger.step("Deleting beta group \(groupID)")
         try await client.deleteBetaGroup(groupID: groupID)
         Logger.success("Beta group deleted")
+    }
+}
+
+// MARK: - update-group
+
+struct IOSBetaUpdateGroupCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "update-group",
+        abstract: "Update a beta group's public link or feedback settings"
+    )
+
+    @Option(name: .long, help: "Beta group ID")
+    var groupID: String
+
+    @Option(name: .long, help: "Enable public link: true or false")
+    var publicLink: String?
+
+    @Option(name: .long, help: "Enable tester feedback: true or false")
+    var feedback: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let publicLinkBool = publicLink.map { $0.lowercased() == "true" }
+        let feedbackBool   = feedback.map   { $0.lowercased() == "true" }
+        Logger.step("Updating beta group \(groupID)")
+        try await client.updateBetaGroup(groupID: groupID, publicLinkEnabled: publicLinkBool, feedbackEnabled: feedbackBool)
+        Logger.success("Beta group updated")
     }
 }

@@ -256,6 +256,41 @@ struct ASCAPIClient {
         return data["data"] as? [String: Any] ?? [:]
     }
 
+    func setAppPriceSchedule(appID: String, pricePointID: String, startDate: String?) async throws {
+        var manualPrice: [String: Any] = [
+            "type": "appPrices",
+            "attributes": ["startDate": startDate as Any],
+            "relationships": [
+                "appPricePoint": ["data": ["type": "appPricePoints", "id": pricePointID]]
+            ]
+        ]
+        if startDate == nil { manualPrice["attributes"] = [:] as [String: Any] }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPriceSchedules",
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]],
+                    "manualPrices": ["data": [manualPrice]]
+                ]
+            ]
+        ]
+        _ = try await post("/appPriceSchedules", body: body)
+    }
+
+    func updateBetaGroup(groupID: String, publicLinkEnabled: Bool?, feedbackEnabled: Bool?) async throws {
+        var attrs: [String: Any] = [:]
+        if let p = publicLinkEnabled { attrs["publicLinkEnabled"] = p }
+        if let f = feedbackEnabled { attrs["feedbackEnabled"] = f }
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaGroups",
+                "id": groupID,
+                "attributes": attrs,
+            ]
+        ]
+        _ = try await patch("/betaGroups/\(groupID)", body: body)
+    }
+
     func getAvailableTerritories(appID: String) async throws -> [[String: Any]] {
         let data = try await get("/apps/\(appID)/availableTerritories")
         return data["data"] as? [[String: Any]] ?? []
