@@ -994,6 +994,41 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - APK Listings (per-version release notes)
+
+    func listApkListings(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/listings")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        try await abandonEdit(packageName: packageName, editID: editID, token: token)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["listings"] as? [[String: Any]] ?? []
+    }
+
+    func updateApkListing(packageName: String, versionCode: Int, language: String, recentChanges: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/listings/\(language)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["language": language, "recentChanges": recentChanges])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
     // MARK: - App Details
 
     func getAppDetails(packageName: String) async throws -> [String: Any] {
