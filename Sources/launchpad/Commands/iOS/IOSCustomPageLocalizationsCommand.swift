@@ -9,6 +9,7 @@ struct IOSCustomPageLocalizationsCommand: ParsableCommand {
             IOSCustomPageLocListCommand.self,
             IOSCustomPageLocCreateCommand.self,
             IOSCustomPageLocUpdateCommand.self,
+            IOSCustomPageLocDeleteCommand.self,
         ]
     )
 }
@@ -74,5 +75,20 @@ struct IOSCustomPageLocUpdateCommand: AsyncParsableCommand {
         Logger.step("Updating localization \(localizationID)")
         try await client.updateCustomProductPageLocalization(localizationID: localizationID, promotionalText: promotionalText)
         Logger.success("Localization updated")
+    }
+}
+
+struct IOSCustomPageLocDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete a localization from a custom product page version")
+
+    @Option(name: .long, help: "Localization ID (from list)")
+    var localizationID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting custom page localization \(localizationID)")
+        try await client.deleteCustomProductPageLocalization(localizationID: localizationID)
+        Logger.success("Localization deleted")
     }
 }

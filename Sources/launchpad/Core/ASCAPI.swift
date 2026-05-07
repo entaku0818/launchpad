@@ -879,6 +879,10 @@ struct ASCAPIClient {
         _ = try await patch("/appCustomProductPageLocalizations/\(localizationID)", body: body)
     }
 
+    func deleteCustomProductPageLocalization(localizationID: String) async throws {
+        try await delete("/appCustomProductPageLocalizations/\(localizationID)")
+    }
+
     // MARK: - Customer Reviews
 
     func getCustomerReviews(appID: String, limit: Int = 20) async throws -> [[String: Any]] {

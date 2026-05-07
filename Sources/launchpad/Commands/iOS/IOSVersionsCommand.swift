@@ -12,6 +12,7 @@ struct IOSVersionsCommand: AsyncParsableCommand {
             IOSVersionsUpdateCommand.self,
             IOSVersionsDeleteCommand.self,
             IOSVersionsReleaseCommand.self,
+            IOSVersionsSetBuildCommand.self,
         ]
     )
 }
@@ -172,5 +173,23 @@ struct IOSVersionsReleaseCommand: AsyncParsableCommand {
         Logger.step("Requesting release for version \(versionID)")
         let requestID = try await client.requestVersionRelease(versionID: versionID)
         Logger.success("Release request submitted: \(requestID)")
+    }
+}
+
+struct IOSVersionsSetBuildCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set-build", abstract: "Associate a build with an App Store version")
+
+    @Option(name: .long, help: "App Store version ID (from ios versions list)")
+    var versionID: String
+
+    @Option(name: .long, help: "Build ID (from ios builds list)")
+    var buildID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Associating build \(buildID) with version \(versionID)")
+        try await client.setBuildForVersion(versionID: versionID, buildID: buildID)
+        Logger.success("Build associated with version")
     }
 }
