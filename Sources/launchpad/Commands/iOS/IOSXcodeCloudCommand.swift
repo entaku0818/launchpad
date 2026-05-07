@@ -12,6 +12,7 @@ struct IOSXcodeCloudCommand: AsyncParsableCommand {
             IOSXcodeCloudStartCommand.self,
             IOSXcodeCloudArtifactsCommand.self,
             IOSXcodeCloudTestResultsCommand.self,
+            IOSXcodeCloudIssuesCommand.self,
         ]
     )
 }
@@ -162,6 +163,31 @@ struct IOSXcodeCloudTestResultsCommand: AsyncParsableCommand {
             let status     = attrs["status"] as? String ?? "-"
             let icon = status == "SUCCESS" ? "✓" : status == "FAILURE" ? "✗" : status == "SKIPPED" ? "⊘" : "●"
             print("  \(icon) \(className).\(testName)  [\(status)]")
+        }
+    }
+}
+
+struct IOSXcodeCloudIssuesCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "issues", abstract: "List build issues for a CI build run")
+
+    @Option(name: .long, help: "Build run ID")
+    var buildRunID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching issues for build run \(buildRunID)")
+        let issues = try await client.listCIIssues(buildRunID: buildRunID)
+
+        if issues.isEmpty { Logger.info("No issues found"); return }
+        Logger.info("\(issues.count) issue(s)\n")
+        for i in issues {
+            guard let attrs = i["attributes"] as? [String: Any] else { continue }
+            let category  = attrs["issueType"] as? String ?? "-"
+            let message   = attrs["message"] as? String ?? "-"
+            let severity  = attrs["category"] as? String ?? "-"
+            let icon = severity == "ERROR" ? "✗" : severity == "WARNING" ? "⚠" : "●"
+            print("  \(icon) [\(category)] \(message)")
         }
     }
 }

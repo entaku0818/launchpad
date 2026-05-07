@@ -739,6 +739,45 @@ struct ASCAPIClient {
         try await delete("/appStoreVersionExperiments/\(experimentID)")
     }
 
+    // MARK: - App Review Attachments
+
+    func listReviewAttachments(appStoreVersionID: String) async throws -> [[String: Any]] {
+        let json = try await get("/appStoreVersions/\(appStoreVersionID)/appStoreReviewDetail?include=appStoreReviewAttachments")
+        if let detail = json["data"] as? [String: Any],
+           let included = json["included"] as? [[String: Any]] {
+            _ = detail
+            return included.filter { $0["type"] as? String == "appStoreReviewAttachments" }
+        }
+        return []
+    }
+
+    func getOrCreateReviewDetail(appStoreVersionID: String) async throws -> String {
+        let existing = try await get("/appStoreVersions/\(appStoreVersionID)/appStoreReviewDetail")
+        if let detail = existing["data"] as? [String: Any], let id = detail["id"] as? String {
+            return id
+        }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreReviewDetails",
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": appStoreVersionID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appStoreReviewDetails", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    // MARK: - CI Issues
+
+    func listCIIssues(buildRunID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciBuildRuns/\(buildRunID)/issues?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Export Compliance (Encryption Declarations)
 
     func listEncryptionDeclarations(appID: String) async throws -> [[String: Any]] {
