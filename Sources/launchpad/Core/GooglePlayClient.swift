@@ -618,6 +618,60 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
+    // MARK: - Purchase Verification
+
+    func verifyProductPurchase(packageName: String, productID: String, token: String) async throws -> [String: Any] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/products/\(productID)/tokens/\(token)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func verifySubscriptionPurchase(packageName: String, subscriptionID: String, token: String) async throws -> [String: Any] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/tokens/\(token)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func acknowledgePurchase(packageName: String, productID: String, token: String) async throws {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/products/\(productID)/tokens/\(token):acknowledge")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = Data("{}".utf8)
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, "acknowledge failed")
+        }
+    }
+
+    func acknowledgeSubscription(packageName: String, subscriptionID: String, token: String) async throws {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/tokens/\(token):acknowledge")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = Data("{}".utf8)
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, "acknowledge failed")
+        }
+    }
+
     // MARK: - OAuth2
 
     private func accessToken() async throws -> String {
