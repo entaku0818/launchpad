@@ -779,6 +779,13 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - Territories Reference
+
+    func listAllTerritories() async throws -> [[String: Any]] {
+        let json = try await get("/territories?limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - App Availability
 
     func setAvailableTerritories(appID: String, territoryCodes: [String]) async throws {

@@ -440,6 +440,39 @@ struct GooglePlayClient {
         return json["bundles"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - System APKs
+
+    func listSystemApks(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/systemApks/\(versionCode)/variants")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["variants"] as? [[String: Any]] ?? []
+    }
+
+    func createSystemApkVariant(packageName: String, versionCode: Int, deviceSpec: [String: Any]) async throws -> Int {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/systemApks/\(versionCode)/variants")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["deviceSpec": deviceSpec])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let variantID = json["variantId"] as? Int else {
+            throw LaunchpadError.invalidResponse
+        }
+        return variantID
+    }
+
     // MARK: - Generated APKs
 
     func listGeneratedApks(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
