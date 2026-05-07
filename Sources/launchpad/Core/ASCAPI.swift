@@ -739,6 +739,35 @@ struct ASCAPIClient {
         try await delete("/appStoreVersionExperiments/\(experimentID)")
     }
 
+    // MARK: - Alternative Distribution (EU)
+
+    func listAlternativeDistributionPackages(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/apps/\(appID)/alternativeDistributionPackages?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listAlternativeDistributionDomains() async throws -> [[String: Any]] {
+        let json = try await get("/alternativeDistributionDomains?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createAlternativeDistributionDomain(referenceName: String, domain: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "alternativeDistributionDomains",
+                "attributes": [
+                    "referenceName": referenceName,
+                    "domain": domain,
+                ]
+            ]
+        ]
+        let json = try await post("/alternativeDistributionDomains", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
     // MARK: - App Review Attachments
 
     func listReviewAttachments(appStoreVersionID: String) async throws -> [[String: Any]] {

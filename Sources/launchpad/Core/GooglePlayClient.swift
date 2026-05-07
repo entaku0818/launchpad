@@ -525,6 +525,46 @@ struct GooglePlayClient {
         return json["bundles"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Internal App Sharing
+
+    func uploadInternalAppSharingAAB(packageName: String, aabPath: String) async throws -> String {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/internalappsharing/\(packageName)/artifacts/bundle?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: aabPath))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let downloadURL = json["downloadUrl"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return downloadURL
+    }
+
+    func uploadInternalAppSharingAPK(packageName: String, apkPath: String) async throws -> String {
+        let token = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/internalappsharing/\(packageName)/artifacts/apk?uploadType=media")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try Data(contentsOf: URL(fileURLWithPath: apkPath))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let downloadURL = json["downloadUrl"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return downloadURL
+    }
+
     // MARK: - System APKs
 
     func listSystemApks(packageName: String, versionCode: Int) async throws -> [[String: Any]] {

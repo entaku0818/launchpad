@@ -48,6 +48,7 @@ struct IOSCommand: ParsableCommand {
             IOSSCMCommand.self,
             IOSEncryptionCommand.self,
             IOSReviewAttachmentsCommand.self,
+            IOSAlternativeDistributionCommand.self,
         ]
     )
 }
