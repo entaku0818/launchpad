@@ -13,7 +13,9 @@ struct AndroidSubscriptionsCommand: AsyncParsableCommand {
             AndroidSubscriptionsArchiveCommand.self,
             AndroidSubscriptionsUpdateCommand.self,
             AndroidBasePlansListCommand.self,
+            AndroidBasePlansCreateCommand.self,
             AndroidBasePlansDeactivateCommand.self,
+            AndroidBasePlansDeleteCommand.self,
             AndroidSubscriptionsCreateCommand.self,
             AndroidSubscriptionsDeleteCommand.self,
         ]
@@ -197,6 +199,61 @@ struct AndroidBasePlansListCommand: AsyncParsableCommand {
             let period = autoRenewingPlan?["billingPeriodDuration"] as? String ?? "-"
             print("  \(id)  state: \(state)  period: \(period)")
         }
+    }
+}
+
+struct AndroidBasePlansCreateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create-base-plan", abstract: "Create a new auto-renewing base plan for a subscription")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var productID: String
+
+    @Option(name: .long, help: "Base plan ID (unique identifier, e.g. monthly-usd)")
+    var basePlanID: String
+
+    @Option(name: .long, help: "Billing period in ISO 8601 duration (e.g. P1M, P1Y, P1W)")
+    var billingPeriod: String
+
+    @Option(name: .long, help: "Comma-separated region codes (e.g. US,JP,GB)")
+    var regions: String = "US"
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+        let regionList = regions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Creating base plan '\(basePlanID)' (\(billingPeriod)) for \(productID)")
+        try await client.createBasePlan(packageName: pkg, productID: productID, basePlanID: basePlanID, billingPeriod: billingPeriod, regionCodes: regionList)
+        Logger.success("Base plan '\(basePlanID)' created — activate it with subscriptions activate")
+    }
+}
+
+struct AndroidBasePlansDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete-base-plan", abstract: "Delete a draft base plan for a subscription")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var productID: String
+
+    @Option(name: .long, help: "Base plan ID")
+    var basePlanID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deleting base plan '\(basePlanID)' from '\(productID)'")
+        try await client.deleteBasePlan(packageName: pkg, productID: productID, basePlanID: basePlanID)
+        Logger.success("Base plan '\(basePlanID)' deleted")
     }
 }
 

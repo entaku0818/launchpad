@@ -314,6 +314,45 @@ struct GooglePlayClient {
         }
     }
 
+    func createBasePlan(packageName: String, productID: String, basePlanID: String, billingPeriod: String, regionCodes: [String]) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let regionalConfigs: [[String: Any]] = regionCodes.map { code in
+            ["regionCode": code, "newSubscriberAvailability": true, "price": [:] as [String: Any]]
+        }
+        let body: [String: Any] = [
+            "basePlanId": basePlanID,
+            "autoRenewingBasePlanType": [
+                "billingPeriodDuration": billingPeriod,
+                "resubscribeState": "RESUBSCRIBE_STATE_ACTIVE",
+                "prorationMode": "IMMEDIATE_WITH_TIME_PRORATION",
+            ],
+            "regionalConfigs": regionalConfigs,
+            "state": "DRAFT",
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    func deleteBasePlan(packageName: String, productID: String, basePlanID: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func listBasePlans(packageName: String, productID: String) async throws -> [[String: Any]] {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans")!
