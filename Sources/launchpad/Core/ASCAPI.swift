@@ -838,6 +838,11 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func getAppStoreVersionDetail(versionID: String) async throws -> [String: Any] {
+        let data = try await get("/appStoreVersions/\(versionID)?include=appStoreVersionLocalizations,routingAppCoverage,appStoreVersionPhasedRelease")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
     func updateAppStoreVersion(versionID: String, versionString: String?, releaseType: String?, earliestReleaseDate: String?, usesNonExemptEncryption: Bool?) async throws {
         var attrs: [String: Any] = [:]
         if let versionString { attrs["versionString"] = versionString }
@@ -1719,6 +1724,27 @@ struct ASCAPIClient {
     func getSubscriptionGroups(appID: String) async throws -> [[String: Any]] {
         let data = try await get("/subscriptionGroups?filter[app]=\(appID)&fields[subscriptionGroups]=referenceName")
         return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscriptionGroup(appID: String, referenceName: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionGroups",
+                "attributes": ["referenceName": referenceName],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/subscriptionGroups", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteSubscriptionGroup(groupID: String) async throws {
+        try await delete("/subscriptionGroups/\(groupID)")
     }
 
     func getSubscriptions(groupID: String) async throws -> [[String: Any]] {

@@ -7,6 +7,7 @@ struct AndroidOffersCommand: AsyncParsableCommand {
         abstract: "Manage subscription base plan offers (free trials, intro pricing)",
         subcommands: [
             AndroidOffersListCommand.self,
+            AndroidOffersGetCommand.self,
             AndroidOffersActivateCommand.self,
             AndroidOffersCreateCommand.self,
             AndroidOffersDeactivateCommand.self,
@@ -48,6 +49,47 @@ struct AndroidOffersListCommand: AsyncParsableCommand {
                 let type     = p["phaseType"] as? String ?? "-"
                 print("    phase: \(type)  \(duration)")
             }
+        }
+    }
+}
+
+struct AndroidOffersGetCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "get", abstract: "Get details of a specific offer")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var productID: String
+
+    @Option(name: .long, help: "Base plan ID")
+    var basePlanID: String
+
+    @Option(name: .long, help: "Offer ID")
+    var offerID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Fetching offer \(offerID) from \(productID)/\(basePlanID)")
+        let offer = try await client.getSubscriptionOffer(packageName: pkg, productID: productID, basePlanID: basePlanID, offerID: offerID)
+
+        let state   = offer["state"] as? String ?? "-"
+        let tags    = offer["offerTags"] as? [[String: Any]] ?? []
+        let phases  = offer["phases"] as? [[String: Any]] ?? []
+        print("offerID: \(offerID)")
+        print("state:   \(state)")
+        if !tags.isEmpty {
+            let tagNames = tags.compactMap { $0["tag"] as? String }.joined(separator: ", ")
+            print("tags:    \(tagNames)")
+        }
+        for (i, phase) in phases.enumerated() {
+            let type     = phase["phaseType"] as? String ?? "-"
+            let duration = phase["regionConfigs"] as? String ?? ""
+            print("phase[\(i)]: \(type) \(duration)")
         }
     }
 }

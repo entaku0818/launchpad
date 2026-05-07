@@ -7,12 +7,51 @@ struct IOSVersionsCommand: AsyncParsableCommand {
         abstract: "Manage App Store versions",
         subcommands: [
             IOSVersionsListCommand.self,
+            IOSVersionsGetCommand.self,
             IOSVersionsCreateCommand.self,
             IOSVersionsUpdateCommand.self,
             IOSVersionsDeleteCommand.self,
             IOSVersionsReleaseCommand.self,
         ]
     )
+}
+
+struct IOSVersionsGetCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "get", abstract: "Show details of a specific App Store version by ID")
+
+    @Option(name: .long, help: "App Store version ID (from ios versions list)")
+    var versionID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching version \(versionID)")
+        let version = try await client.getAppStoreVersionDetail(versionID: versionID)
+
+        guard let attrs = version["attributes"] as? [String: Any] else {
+            Logger.info("Version not found"); return
+        }
+        let ver          = attrs["versionString"] as? String ?? "-"
+        let state        = attrs["appStoreState"] as? String ?? "-"
+        let releaseType  = attrs["releaseType"] as? String ?? "-"
+        let platform     = attrs["platform"] as? String ?? "-"
+        let created      = attrs["createdDate"] as? String ?? "-"
+        let scheduleDate = attrs["earliestReleaseDate"] as? String ?? ""
+        let useEncrypt   = attrs["usesNonExemptEncryption"] as? Bool ?? false
+
+        print("Version:          \(ver)")
+        print("State:            \(state)")
+        print("Platform:         \(platform)")
+        print("Release type:     \(releaseType)")
+        print("Encryption:       \(useEncrypt)")
+        print("Created:          \(created)")
+        if !scheduleDate.isEmpty { print("Scheduled date:   \(scheduleDate)") }
+
+        if let included = version["relationships"] as? [String: Any],
+           let locs = (included["appStoreVersionLocalizations"] as? [String: Any])?["data"] as? [[String: Any]] {
+            print("Localizations:    \(locs.count) locale(s)")
+        }
+    }
 }
 
 struct IOSVersionsListCommand: AsyncParsableCommand {
