@@ -39,6 +39,7 @@ struct IOSCommand: ParsableCommand {
             IOSPricePointsCommand.self,
             IOSAvailabilityCommand.self,
             IOSAppInfoCommand.self,
+            IOSBetaFeedbackCommand.self,
         ]
     )
 }

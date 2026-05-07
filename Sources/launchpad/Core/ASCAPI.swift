@@ -550,6 +550,18 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Beta Feedback
+
+    func getBetaFeedback(appID: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let json = try await get("/betaFeedbacks?filter[tester.apps]=\(appID)&limit=\(limit)&sort=-timestamp")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func getBuildCrashes(buildID: String, limit: Int = 20) async throws -> [[String: Any]] {
+        let json = try await get("/builds/\(buildID)/diagnosticSignatures?limit=\(limit)")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - App Info Localizations
 
     func getAppInfoLocalizations(appInfoID: String) async throws -> [[String: Any]] {
