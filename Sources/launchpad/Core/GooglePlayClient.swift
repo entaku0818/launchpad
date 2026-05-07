@@ -440,6 +440,25 @@ struct GooglePlayClient {
         return json["bundles"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - APKs
+
+    func listApks(packageName: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        _ = try? await URLSession.shared.data(for: {
+            var r = URLRequest(url: URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!)
+            r.httpMethod = "DELETE"; r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); return r
+        }())
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["apks"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Data Safety
 
     func getDataSafety(packageName: String) async throws -> [String: Any] {
