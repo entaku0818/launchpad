@@ -869,6 +869,18 @@ struct ASCAPIClient {
         return json["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - CI Xcode Versions
+
+    func listCIXcodeVersions() async throws -> [[String: Any]] {
+        let json = try await get("/ciXcodeVersions?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listCITestDestinations(xcodeVersionID: String) async throws -> [[String: Any]] {
+        let json = try await get("/ciXcodeVersions/\(xcodeVersionID)/macOsVersions?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Xcode Cloud (CI)
 
     func listCIProducts(appID: String) async throws -> [[String: Any]] {

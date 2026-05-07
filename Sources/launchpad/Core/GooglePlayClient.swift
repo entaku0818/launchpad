@@ -409,6 +409,27 @@ struct GooglePlayClient {
         return json["offers"] as? [[String: Any]] ?? []
     }
 
+    func createSubscriptionOffer(packageName: String, productID: String, basePlanID: String, offerID: String, phases: [[String: Any]]) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "packageName": packageName,
+            "productId": productID,
+            "basePlanId": basePlanID,
+            "offerId": offerID,
+            "phases": phases,
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func activateOffer(packageName: String, productID: String, basePlanID: String, offerID: String) async throws {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)/basePlans/\(basePlanID)/offers/\(offerID):activate")!

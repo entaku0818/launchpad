@@ -13,6 +13,7 @@ struct IOSXcodeCloudCommand: AsyncParsableCommand {
             IOSXcodeCloudArtifactsCommand.self,
             IOSXcodeCloudTestResultsCommand.self,
             IOSXcodeCloudIssuesCommand.self,
+            IOSXcodeVersionsCommand.self,
         ]
     )
 }
@@ -188,6 +189,27 @@ struct IOSXcodeCloudIssuesCommand: AsyncParsableCommand {
             let severity  = attrs["category"] as? String ?? "-"
             let icon = severity == "ERROR" ? "✗" : severity == "WARNING" ? "⚠" : "●"
             print("  \(icon) [\(category)] \(message)")
+        }
+    }
+}
+
+struct IOSXcodeVersionsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "xcode-versions", abstract: "List Xcode versions available for CI builds")
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching available Xcode versions")
+        let versions = try await client.listCIXcodeVersions()
+
+        if versions.isEmpty { Logger.info("No Xcode versions found"); return }
+        Logger.info("\(versions.count) version(s)\n")
+        for v in versions {
+            guard let id = v["id"] as? String,
+                  let attrs = v["attributes"] as? [String: Any] else { continue }
+            let version = attrs["version"] as? String ?? "-"
+            let released = attrs["released"] as? Bool ?? false
+            print("  Xcode \(version)  released: \(released)  id: \(id)")
         }
     }
 }
