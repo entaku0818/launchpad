@@ -550,6 +550,63 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Beta License Agreements
+
+    func getBetaLicenseAgreements(appID: String) async throws -> [String: Any] {
+        let json = try await get("/apps/\(appID)/betaLicenseAgreement")
+        return json["data"] as? [String: Any] ?? [:]
+    }
+
+    func updateBetaLicenseAgreement(agreementID: String, agreementText: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaLicenseAgreements",
+                "id": agreementID,
+                "attributes": ["agreementText": agreementText]
+            ]
+        ]
+        _ = try await patch("/betaLicenseAgreements/\(agreementID)", body: body)
+    }
+
+    // MARK: - Product Page Optimization (A/B Experiments)
+
+    func listAppStoreVersionExperiments(versionID: String) async throws -> [[String: Any]] {
+        let json = try await get("/appStoreVersions/\(versionID)/appStoreVersionExperiments?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createProductPageExperiment(versionID: String, name: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionExperiments",
+                "attributes": ["name": name],
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]]
+                ]
+            ]
+        ]
+        let json = try await post("/appStoreVersionExperiments", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func startProductPageExperiment(experimentID: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersionExperiments",
+                "id": experimentID,
+                "attributes": ["started": true]
+            ]
+        ]
+        _ = try await patch("/appStoreVersionExperiments/\(experimentID)", body: body)
+    }
+
+    func deleteProductPageExperiment(experimentID: String) async throws {
+        try await delete("/appStoreVersionExperiments/\(experimentID)")
+    }
+
     // MARK: - Xcode Cloud (CI)
 
     func listCIProducts(appID: String) async throws -> [[String: Any]] {
