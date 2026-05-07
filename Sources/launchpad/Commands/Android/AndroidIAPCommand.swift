@@ -12,6 +12,7 @@ struct AndroidIAPCommand: AsyncParsableCommand {
             AndroidIAPDeactivateCommand.self,
             AndroidIAPCreateCommand.self,
             AndroidIAPDeleteCommand.self,
+            AndroidIAPUpdatePriceCommand.self,
         ]
     )
 }
@@ -217,5 +218,32 @@ struct AndroidIAPDeleteCommand: AsyncParsableCommand {
         Logger.step("Deleting IAP product '\(sku)'")
         try await client.deleteIAP(packageName: pkg, sku: sku)
         Logger.success("IAP product '\(sku)' deleted")
+    }
+}
+
+struct AndroidIAPUpdatePriceCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "update-price", abstract: "Update the default price of an in-app product")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product SKU")
+    var sku: String
+
+    @Option(name: .long, help: "Price in micros (e.g. 990000 for $0.99)")
+    var priceMicros: String
+
+    @Option(name: .long, help: "Currency code (e.g. USD, JPY)")
+    var currency: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Updating price for \(sku) to \(priceMicros) \(currency)")
+        try await client.updateIAPPrice(packageName: pkg, sku: sku, priceMicros: priceMicros, priceCurrencyCode: currency)
+        Logger.success("Price updated for \(sku)")
     }
 }

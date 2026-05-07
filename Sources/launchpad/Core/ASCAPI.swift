@@ -728,6 +728,21 @@ struct ASCAPIClient {
         try await delete("/sandboxTesters/\(id)")
     }
 
+    func clearSandboxPurchases(testerID: String) async throws {
+        _ = try await post("/sandboxTesters/\(testerID)/clearPurchaseHistory", body: [:])
+    }
+
+    func updateSandboxTesterRenewalRate(testerID: String, subscriptionRenewalRate: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "sandboxTesters",
+                "id": testerID,
+                "attributes": ["subscriptionRenewalRate": subscriptionRenewalRate],
+            ]
+        ]
+        _ = try await patch("/sandboxTesters/\(testerID)", body: body)
+    }
+
     // MARK: - Age Rating
 
     func getAgeRatingDeclaration(versionID: String) async throws -> [String: Any] {

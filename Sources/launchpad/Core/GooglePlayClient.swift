@@ -401,6 +401,23 @@ struct GooglePlayClient {
         }
     }
 
+    func updateIAPPrice(packageName: String, sku: String, priceMicros: String, priceCurrencyCode: String) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/inappproducts/\(sku)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "defaultPrice": ["priceMicros": priceMicros, "currency": priceCurrencyCode]
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     // MARK: - Store Images
 
     func listImages(packageName: String, language: String, imageType: String) async throws -> [[String: Any]] {
