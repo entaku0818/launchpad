@@ -9,6 +9,7 @@ struct IOSIAPCommand: AsyncParsableCommand {
             IOSIAPListCommand.self,
             IOSIAPGetCommand.self,
             IOSIAPCreateCommand.self,
+            IOSIAPUpdateCommand.self,
             IOSIAPDeleteCommand.self,
         ]
     )
@@ -101,6 +102,27 @@ struct IOSIAPCreateCommand: AsyncParsableCommand {
         Logger.step("Creating IAP '\(productID)' [\(iapType)]")
         let id = try await client.createInAppPurchase(appID: appID, productID: productID, name: name, iapType: iapType, reviewNote: reviewNote)
         Logger.success("IAP created: \(id)")
+    }
+}
+
+struct IOSIAPUpdateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "update", abstract: "Update an in-app purchase reference name or review note")
+
+    @Option(name: .long, help: "In-app purchase ID")
+    var iapID: String
+
+    @Option(name: .long, help: "New reference name")
+    var name: String?
+
+    @Option(name: .long, help: "New review note for App Review")
+    var reviewNote: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Updating IAP \(iapID)")
+        try await client.updateInAppPurchase(iapID: iapID, name: name, reviewNote: reviewNote)
+        Logger.success("IAP updated")
     }
 }
 

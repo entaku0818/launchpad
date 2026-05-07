@@ -13,8 +13,12 @@ struct IOSProvisioningCommand: AsyncParsableCommand {
             IOSBundleIDsListCommand.self,
             IOSBundleIDsRegisterCommand.self,
             IOSBundleIDsDeleteCommand.self,
+            IOSBundleIDCapabilitiesListCommand.self,
+            IOSBundleIDCapabilityEnableCommand.self,
+            IOSBundleIDCapabilityDisableCommand.self,
             IOSProfilesListCommand.self,
             IOSProfilesDownloadCommand.self,
+            IOSProfilesCreateCommand.self,
             IOSProfilesDeleteCommand.self,
         ]
     )
@@ -195,6 +199,64 @@ struct IOSBundleIDsDeleteCommand: AsyncParsableCommand {
     }
 }
 
+// MARK: - bundle ID capabilities
+
+struct IOSBundleIDCapabilitiesListCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "capabilities", abstract: "List capabilities enabled for a bundle ID")
+
+    @Option(name: .long, help: "Bundle ID resource ID (from bundle-ids)")
+    var bundleIDResourceID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Fetching capabilities for bundle ID \(bundleIDResourceID)")
+        let caps = try await client.listBundleIDCapabilities(bundleIDResourceID: bundleIDResourceID)
+
+        if caps.isEmpty { Logger.info("No capabilities enabled"); return }
+        Logger.info("\(caps.count) capability/capabilities enabled\n")
+        for c in caps {
+            guard let id = c["id"] as? String,
+                  let attrs = c["attributes"] as? [String: Any] else { continue }
+            let capType = attrs["capabilityType"] as? String ?? "-"
+            print("  \(capType)  id: \(id)")
+        }
+    }
+}
+
+struct IOSBundleIDCapabilityEnableCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "enable-capability", abstract: "Enable a capability for a bundle ID")
+
+    @Option(name: .long, help: "Bundle ID resource ID (from bundle-ids)")
+    var bundleIDResourceID: String
+
+    @Option(name: .long, help: "Capability type, e.g. PUSH_NOTIFICATIONS, APPLE_PAY, IN_APP_PURCHASE, GAME_CENTER")
+    var capability: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Enabling \(capability) for bundle ID \(bundleIDResourceID)")
+        let id = try await client.enableBundleIDCapability(bundleIDResourceID: bundleIDResourceID, capabilityType: capability)
+        Logger.success("Capability enabled: \(id)")
+    }
+}
+
+struct IOSBundleIDCapabilityDisableCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "disable-capability", abstract: "Disable a capability for a bundle ID")
+
+    @Option(name: .long, help: "Capability ID (from capabilities list)")
+    var capabilityID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Disabling capability \(capabilityID)")
+        try await client.disableBundleIDCapability(capabilityID: capabilityID)
+        Logger.success("Capability disabled")
+    }
+}
+
 // MARK: - profiles list
 
 struct IOSProfilesListCommand: AsyncParsableCommand {
@@ -243,6 +305,47 @@ struct IOSProfilesDownloadCommand: AsyncParsableCommand {
         let data = try await client.downloadProfile(profileID: profileID)
         try data.write(to: URL(fileURLWithPath: dest))
         Logger.success("Profile saved to \(dest)")
+    }
+}
+
+// MARK: - profiles create
+
+struct IOSProfilesCreateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "create-profile", abstract: "Create a new provisioning profile")
+
+    @Option(name: .long, help: "Profile display name")
+    var name: String
+
+    @Option(name: .long, help: "Profile type: IOS_APP_DEVELOPMENT, IOS_APP_STORE, IOS_APP_ADHOC, IOS_APP_INHOUSE")
+    var profileType: String = "IOS_APP_STORE"
+
+    @Option(name: .long, help: "Bundle ID resource ID (from bundle-ids)")
+    var bundleIDResourceID: String
+
+    @Option(name: .long, help: "Comma-separated certificate IDs (from certs)")
+    var certificateIDs: String
+
+    @Option(name: .long, help: "Comma-separated device IDs (from devices, required for DEVELOPMENT/ADHOC)")
+    var deviceIDs: String = ""
+
+    @Option(name: .long, help: "Output path for the .mobileprovision file (default: <name>.mobileprovision)")
+    var output: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let certList   = certificateIDs.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let deviceList = deviceIDs.isEmpty ? [] : deviceIDs.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Creating provisioning profile '\(name)' [\(profileType)]")
+        let (id, profileData) = try await client.createProfile(
+            name: name, profileType: profileType,
+            bundleIDResourceID: bundleIDResourceID,
+            certificateIDs: certList, deviceIDs: deviceList
+        )
+        let dest = output ?? "\(name.replacingOccurrences(of: " ", with: "_")).mobileprovision"
+        try profileData.write(to: URL(fileURLWithPath: dest))
+        Logger.success("Profile created: \(id)")
+        Logger.info("Saved to \(dest)")
     }
 }
 

@@ -538,6 +538,59 @@ struct ASCAPIClient {
         try await delete("/bundleIds/\(bundleIDResourceID)")
     }
 
+    func listBundleIDCapabilities(bundleIDResourceID: String) async throws -> [[String: Any]] {
+        let data = try await get("/bundleIds/\(bundleIDResourceID)/bundleIdCapabilities")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func enableBundleIDCapability(bundleIDResourceID: String, capabilityType: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "bundleIdCapabilities",
+                "attributes": ["capabilityType": capabilityType, "settings": []],
+                "relationships": [
+                    "bundleId": ["data": ["type": "bundleIds", "id": bundleIDResourceID]]
+                ]
+            ]
+        ]
+        let json = try await post("/bundleIdCapabilities", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func disableBundleIDCapability(capabilityID: String) async throws {
+        try await delete("/bundleIdCapabilities/\(capabilityID)")
+    }
+
+    func createProfile(name: String, profileType: String, bundleIDResourceID: String, certificateIDs: [String], deviceIDs: [String]) async throws -> (id: String, content: Data) {
+        let certs = certificateIDs.map { ["type": "certificates", "id": $0] }
+        let devs  = deviceIDs.map    { ["type": "devices",      "id": $0] }
+        let body: [String: Any] = [
+            "data": [
+                "type": "profiles",
+                "attributes": ["name": name, "profileType": profileType],
+                "relationships": [
+                    "bundleId":     ["data": ["type": "bundleIds",     "id": bundleIDResourceID]],
+                    "certificates": ["data": certs],
+                    "devices":      ["data": devs],
+                ]
+            ]
+        ]
+        let json = try await post("/profiles", body: body)
+        guard
+            let d = json["data"] as? [String: Any],
+            let id = d["id"] as? String,
+            let attrs = d["attributes"] as? [String: Any],
+            let content = attrs["profileContent"] as? String,
+            let profileData = Data(base64Encoded: content)
+        else {
+            throw LaunchpadError.invalidResponse
+        }
+        return (id, profileData)
+    }
+
     // MARK: - Provisioning — Profiles
 
     func listProfiles(limit: Int = 50) async throws -> [[String: Any]] {
@@ -1558,6 +1611,16 @@ struct ASCAPIClient {
             throw LaunchpadError.invalidResponse
         }
         return id
+    }
+
+    func updateInAppPurchase(iapID: String, name: String?, reviewNote: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let name { attrs["name"] = name }
+        if let reviewNote { attrs["reviewNote"] = reviewNote }
+        let body: [String: Any] = [
+            "data": ["type": "inAppPurchases", "id": iapID, "attributes": attrs]
+        ]
+        _ = try await patch("/inAppPurchasesV2/\(iapID)", body: body)
     }
 
     func deleteInAppPurchase(iapID: String) async throws {
