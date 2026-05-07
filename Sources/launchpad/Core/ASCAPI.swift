@@ -550,6 +550,29 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - App Info Localizations
+
+    func getAppInfoLocalizations(appInfoID: String) async throws -> [[String: Any]] {
+        let json = try await get("/appInfos/\(appInfoID)/appInfoLocalizations?limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func updateAppInfoLocalization(localizationID: String, name: String?, subtitle: String?, privacyPolicyURL: String?, privacyPolicyText: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let n = name { attrs["name"] = n }
+        if let s = subtitle { attrs["subtitle"] = s }
+        if let u = privacyPolicyURL { attrs["privacyPolicyUrl"] = u }
+        if let t = privacyPolicyText { attrs["privacyPolicyText"] = t }
+        let body: [String: Any] = [
+            "data": [
+                "type": "appInfoLocalizations",
+                "id": localizationID,
+                "attributes": attrs,
+            ]
+        ]
+        _ = try await patch("/appInfoLocalizations/\(localizationID)", body: body)
+    }
+
     // MARK: - App Categories
 
     func getAppInfo(appID: String) async throws -> [String: Any] {
