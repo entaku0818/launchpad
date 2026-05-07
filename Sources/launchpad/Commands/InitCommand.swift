@@ -68,6 +68,10 @@ struct InitCommand: ParsableCommand {
         SEARCH_ADS_KEY_ID=
         SEARCH_ADS_PRIVATE_KEY_CONTENT=
         # SEARCH_ADS_ORG_ID=   # optional: specify org for multi-org accounts
+
+        # Usage analytics (creator only — set your own endpoint to track command usage)
+        # LAUNCHPAD_TELEMETRY_URL=https://your-endpoint.example.com/events
+        # LAUNCHPAD_TELEMETRY_TOKEN=   # optional bearer token
         """
         try template.write(toFile: path, atomically: true, encoding: .utf8)
         Logger.info("Created \(path)")
