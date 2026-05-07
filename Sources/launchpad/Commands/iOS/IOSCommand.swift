@@ -69,6 +69,8 @@ struct IOSCommand: ParsableCommand {
             IOSSubscriptionAvailabilityCommand.self,
             IOSSubscriptionPricesCommand.self,
             IOSReviewDetailCommand.self,
+            IOSPerfMetricsCommand.self,
+            IOSNotarizeCommand.self,
         ]
     )
 }

@@ -2425,6 +2425,32 @@ struct ASCAPIClient {
         try await delete("/gameCenterAchievements/\(achievementID)")
     }
 
+    // MARK: - Performance / Power Metrics
+
+    func getPerfPowerMetrics(buildID: String, metricTypes: [String]? = nil, deviceType: String? = nil) async throws -> [[String: Any]] {
+        var params = "?limit=200"
+        if let types = metricTypes, !types.isEmpty {
+            params += "&filter[metricType]=" + types.joined(separator: ",")
+        }
+        if let device = deviceType {
+            params += "&filter[deviceType]=\(device)"
+        }
+        let json = try await get("/builds/\(buildID)/perfPowerMetrics\(params)")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func getAppPerfPowerMetrics(appID: String, metricTypes: [String]? = nil, deviceType: String? = nil) async throws -> [[String: Any]] {
+        var params = "?limit=200"
+        if let types = metricTypes, !types.isEmpty {
+            params += "&filter[metricType]=" + types.joined(separator: ",")
+        }
+        if let device = deviceType {
+            params += "&filter[deviceType]=\(device)"
+        }
+        let json = try await get("/apps/\(appID)/perfPowerMetrics\(params)")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - HTTP
 
     private func get(_ path: String) async throws -> [String: Any] {

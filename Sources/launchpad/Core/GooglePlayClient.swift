@@ -1417,7 +1417,7 @@ struct GooglePlayClient {
 
     // MARK: - OAuth2
 
-    private func accessToken() async throws -> String {
+    func accessToken() async throws -> String {
         guard
             let email = serviceAccountJSON["client_email"] as? String,
             let pemKey = serviceAccountJSON["private_key"] as? String
