@@ -994,6 +994,47 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - App Details
+
+    func getAppDetails(packageName: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/details")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        try await abandonEdit(packageName: packageName, editID: editID, token: token)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func updateAppDetails(packageName: String, defaultLanguage: String?, contactEmail: String?, contactPhone: String?, contactWebsite: String?) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        var details: [String: Any] = [:]
+        if let defaultLanguage { details["defaultLanguage"] = defaultLanguage }
+        if let contactEmail    { details["contactEmail"] = contactEmail }
+        if let contactPhone    { details["contactPhone"] = contactPhone }
+        if let contactWebsite  { details["contactWebsite"] = contactWebsite }
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/details")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: details)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        try await commitEdit(packageName: packageName, editID: editID, token: token)
+    }
+
     // MARK: - Orders
 
     func getOrder(packageName: String, orderID: String) async throws -> [String: Any] {
