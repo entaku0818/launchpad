@@ -49,6 +49,7 @@ struct IOSCommand: ParsableCommand {
             IOSEncryptionCommand.self,
             IOSReviewAttachmentsCommand.self,
             IOSAlternativeDistributionCommand.self,
+            IOSBetaAppLocalizationsCommand.self,
         ]
     )
 }

@@ -869,6 +869,51 @@ struct ASCAPIClient {
         return json["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - TestFlight App Localizations
+
+    func getBetaAppLocalizations(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/betaAppLocalizations?filter[app]=\(appID)&limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func updateBetaAppLocalization(localizationID: String, description: String?, feedbackEmail: String?, marketingURL: String?, privacyPolicyURL: String?, tvOSPrivacyPolicy: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let d = description { attrs["description"] = d }
+        if let e = feedbackEmail { attrs["feedbackEmail"] = e }
+        if let u = marketingURL { attrs["marketingUrl"] = u }
+        if let p = privacyPolicyURL { attrs["privacyPolicyUrl"] = p }
+        if let t = tvOSPrivacyPolicy { attrs["tvOsPrivacyPolicy"] = t }
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaAppLocalizations",
+                "id": localizationID,
+                "attributes": attrs,
+            ]
+        ]
+        _ = try await patch("/betaAppLocalizations/\(localizationID)", body: body)
+    }
+
+    func createBetaAppLocalization(appID: String, locale: String, description: String, feedbackEmail: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "betaAppLocalizations",
+                "attributes": [
+                    "locale": locale,
+                    "description": description,
+                    "feedbackEmail": feedbackEmail,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/betaAppLocalizations", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
     // MARK: - CI Xcode Versions
 
     func listCIXcodeVersions() async throws -> [[String: Any]] {
