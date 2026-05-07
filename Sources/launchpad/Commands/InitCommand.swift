@@ -60,6 +60,14 @@ struct InitCommand: ParsableCommand {
 
         # Google Play (service account JSON as single line)
         GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=
+
+        # Apple Search Ads API
+        # https://searchads.apple.com/help/reporting/0000000400
+        SEARCH_ADS_CLIENT_ID=
+        SEARCH_ADS_TEAM_ID=
+        SEARCH_ADS_KEY_ID=
+        SEARCH_ADS_PRIVATE_KEY_CONTENT=
+        # SEARCH_ADS_ORG_ID=   # optional: specify org for multi-org accounts
         """
         try template.write(toFile: path, atomically: true, encoding: .utf8)
         Logger.info("Created \(path)")
