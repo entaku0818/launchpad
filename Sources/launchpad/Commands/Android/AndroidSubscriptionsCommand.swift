@@ -11,6 +11,7 @@ struct AndroidSubscriptionsCommand: AsyncParsableCommand {
             AndroidSubscriptionsActivateCommand.self,
             AndroidSubscriptionsDeactivateCommand.self,
             AndroidSubscriptionsArchiveCommand.self,
+            AndroidSubscriptionsUpdateCommand.self,
             AndroidBasePlansListCommand.self,
             AndroidBasePlansDeactivateCommand.self,
             AndroidSubscriptionsCreateCommand.self,
@@ -249,6 +250,36 @@ struct AndroidSubscriptionsDeleteCommand: AsyncParsableCommand {
         Logger.step("Deleting subscription '\(productID)'")
         try await client.deleteSubscription(packageName: pkg, productID: productID)
         Logger.success("Subscription '\(productID)' deleted")
+    }
+}
+
+struct AndroidSubscriptionsUpdateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "update", abstract: "Update subscription title/description for a locale")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Subscription product ID")
+    var productID: String
+
+    @Option(name: .long, help: "Language code (e.g. en-US, ja-JP)")
+    var language: String = "en-US"
+
+    @Option(name: .long, help: "Display title")
+    var title: String
+
+    @Option(name: .long, help: "Benefits description")
+    var benefits: String = ""
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Updating subscription '\(productID)' [\(language)]")
+        try await client.updateSubscription(packageName: pkg, productID: productID, listings: [language: ["title": title, "benefits": benefits]])
+        Logger.success("Subscription '\(productID)' updated")
     }
 }
 

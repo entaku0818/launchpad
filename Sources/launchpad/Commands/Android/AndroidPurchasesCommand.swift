@@ -8,6 +8,7 @@ struct AndroidPurchasesCommand: AsyncParsableCommand {
         subcommands: [
             AndroidPurchasesVerifyProductCommand.self,
             AndroidPurchasesVerifySubscriptionCommand.self,
+            AndroidPurchasesVerifySubscriptionV2Command.self,
             AndroidPurchasesAcknowledgeProductCommand.self,
             AndroidPurchasesAcknowledgeSubscriptionCommand.self,
             AndroidPurchasesConsumeCommand.self,
@@ -94,6 +95,46 @@ struct AndroidPurchasesVerifySubscriptionCommand: AsyncParsableCommand {
         if let cr = cancelReason {
             let crLabel = cr == 0 ? "USER_CANCELLED" : cr == 1 ? "SYSTEM_CANCELLED" : cr == 2 ? "REPLACED" : cr == 3 ? "DEVELOPER_CANCELLED" : "UNKNOWN"
             print("cancelReason:     \(crLabel)")
+        }
+    }
+}
+
+struct AndroidPurchasesVerifySubscriptionV2Command: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "verify-subscription-v2", abstract: "Verify a subscription using the newer subscriptionsv2 API (returns line items)")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Purchase token from the client")
+    var token: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Verifying subscription purchase (v2)")
+        let result = try await client.verifySubscriptionPurchaseV2(packageName: pkg, token: token)
+
+        let kind             = result["kind"] as? String ?? "-"
+        let regionCode       = result["regionCode"] as? String ?? "-"
+        let startTime        = result["startTime"] as? String ?? "-"
+        let subscriptionState = result["subscriptionState"] as? String ?? "-"
+        let lineItems        = result["lineItems"] as? [[String: Any]] ?? []
+
+        print("\nkind:               \(kind)")
+        print("subscriptionState:  \(subscriptionState)")
+        print("regionCode:         \(regionCode)")
+        print("startTime:          \(startTime)")
+        if !lineItems.isEmpty {
+            print("lineItems:")
+            for item in lineItems {
+                let productID    = item["productId"] as? String ?? "-"
+                let expiryTime   = item["expiryTime"] as? String ?? "-"
+                let autoRenewing = (item["autoRenewingPlan"] as? [String: Any])?["autoRenewEnabled"] as? Bool ?? false
+                print("  \(productID)  expires: \(expiryTime)  autoRenew: \(autoRenewing)")
+            }
         }
     }
 }

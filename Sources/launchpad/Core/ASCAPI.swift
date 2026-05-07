@@ -838,6 +838,22 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func updateAppStoreVersion(versionID: String, versionString: String?, releaseType: String?, earliestReleaseDate: String?, usesNonExemptEncryption: Bool?) async throws {
+        var attrs: [String: Any] = [:]
+        if let versionString { attrs["versionString"] = versionString }
+        if let releaseType { attrs["releaseType"] = releaseType }
+        if let earliestReleaseDate { attrs["earliestReleaseDate"] = earliestReleaseDate }
+        if let usesNonExemptEncryption { attrs["usesNonExemptEncryption"] = usesNonExemptEncryption }
+        let body: [String: Any] = [
+            "data": ["type": "appStoreVersions", "id": versionID, "attributes": attrs]
+        ]
+        _ = try await patch("/appStoreVersions/\(versionID)", body: body)
+    }
+
+    func deleteAppStoreVersion(versionID: String) async throws {
+        try await delete("/appStoreVersions/\(versionID)")
+    }
+
     // MARK: - Builds (TestFlight)
 
     func listBuilds(appID: String, limit: Int = 20) async throws -> [[String: Any]] {

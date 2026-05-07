@@ -8,6 +8,8 @@ struct IOSVersionsCommand: AsyncParsableCommand {
         subcommands: [
             IOSVersionsListCommand.self,
             IOSVersionsCreateCommand.self,
+            IOSVersionsUpdateCommand.self,
+            IOSVersionsDeleteCommand.self,
             IOSVersionsReleaseCommand.self,
         ]
     )
@@ -64,6 +66,58 @@ struct IOSVersionsCreateCommand: AsyncParsableCommand {
         let versionID = try await client.createAppStoreVersion(appID: appID, versionString: version, platform: platform)
         Logger.success("Version \(version) created  id: \(versionID)")
         Logger.info("Next: add metadata, screenshots, then submit for review")
+    }
+}
+
+struct IOSVersionsUpdateCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "update", abstract: "Update version settings (release type, encryption, scheduled release date)")
+
+    @Option(name: .long, help: "App Store version ID (from ios versions list)")
+    var versionID: String
+
+    @Option(name: .long, help: "Version string (e.g. 2.1.1)")
+    var versionString: String?
+
+    @Option(name: .long, help: "Release type: MANUAL, AFTER_APPROVAL, or SCHEDULED")
+    var releaseType: String?
+
+    @Option(name: .long, help: "Earliest release date (ISO 8601, used with SCHEDULED release type)")
+    var earliestReleaseDate: String?
+
+    @Flag(name: .long, help: "Mark as using non-exempt encryption")
+    var usesNonExemptEncryption: Bool = false
+
+    @Flag(name: .long, help: "Mark as NOT using non-exempt encryption")
+    var noEncryption: Bool = false
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let encryptionFlag: Bool? = usesNonExemptEncryption ? true : (noEncryption ? false : nil)
+        Logger.step("Updating version \(versionID)")
+        try await client.updateAppStoreVersion(
+            versionID: versionID,
+            versionString: versionString,
+            releaseType: releaseType,
+            earliestReleaseDate: earliestReleaseDate,
+            usesNonExemptEncryption: encryptionFlag
+        )
+        Logger.success("Version updated")
+    }
+}
+
+struct IOSVersionsDeleteCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete a version in PREPARE_FOR_SUBMISSION state")
+
+    @Option(name: .long, help: "App Store version ID (from ios versions list)")
+    var versionID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        Logger.step("Deleting version \(versionID)")
+        try await client.deleteAppStoreVersion(versionID: versionID)
+        Logger.success("Version deleted")
     }
 }
 

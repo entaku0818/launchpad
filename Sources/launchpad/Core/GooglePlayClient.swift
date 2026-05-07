@@ -241,6 +241,25 @@ struct GooglePlayClient {
         }
     }
 
+    func updateSubscription(packageName: String, productID: String, listings: [String: [String: String]]) async throws {
+        let token = try await accessToken()
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)?updateMask=listings")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "listings": listings.mapValues { l -> [String: Any] in
+                ["title": l["title"] ?? "", "benefits": l["benefits"] ?? ""]
+            }
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
     func deleteSubscription(packageName: String, productID: String) async throws {
         let token = try await accessToken()
         let url = URL(string: "\(baseURL)/applications/\(packageName)/subscriptions/\(productID)")!
@@ -1060,6 +1079,18 @@ struct GooglePlayClient {
     func verifySubscriptionPurchase(packageName: String, subscriptionID: String, token: String) async throws -> [String: Any] {
         let accessTkn = try await accessToken()
         let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptions/\(subscriptionID)/tokens/\(token)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func verifySubscriptionPurchaseV2(packageName: String, token: String) async throws -> [String: Any] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/purchases/subscriptionsv2/tokens/\(token)")!
         var req = URLRequest(url: url)
         req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
         let (data, _) = try await URLSession.shared.data(for: req)
