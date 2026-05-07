@@ -10,6 +10,7 @@ struct AndroidSubscriptionsCommand: AsyncParsableCommand {
             AndroidSubscriptionsGetCommand.self,
             AndroidSubscriptionsActivateCommand.self,
             AndroidSubscriptionsDeactivateCommand.self,
+            AndroidSubscriptionsDeactivateProductCommand.self,
             AndroidSubscriptionsArchiveCommand.self,
             AndroidSubscriptionsUpdateCommand.self,
             AndroidBasePlansListCommand.self,
@@ -337,6 +338,27 @@ struct AndroidSubscriptionsUpdateCommand: AsyncParsableCommand {
         Logger.step("Updating subscription '\(productID)' [\(language)]")
         try await client.updateSubscription(packageName: pkg, productID: productID, listings: [language: ["title": title, "benefits": benefits]])
         Logger.success("Subscription '\(productID)' updated")
+    }
+}
+
+struct AndroidSubscriptionsDeactivateProductCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "deactivate-product", abstract: "Deactivate a subscription product (can be reactivated, unlike archive)")
+
+    @Option(name: .long, help: "Package name [config: android.packageName]")
+    var packageName: String?
+
+    @Option(name: .long, help: "Product ID (SKU)")
+    var productID: String
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().android
+        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
+
+        let client = try GooglePlayClient.fromEnvironment()
+        Logger.step("Deactivating subscription product '\(productID)'")
+        try await client.deactivateSubscription(packageName: pkg, productID: productID)
+        Logger.success("Subscription '\(productID)' deactivated")
     }
 }
 
