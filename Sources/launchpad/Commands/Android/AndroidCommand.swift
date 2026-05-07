@@ -34,6 +34,8 @@ struct AndroidCommand: ParsableCommand {
             AndroidSystemApksCommand.self,
             AndroidPricingCommand.self,
             AndroidInternalShareCommand.self,
+            AndroidOrdersCommand.self,
+            AndroidListingsCommand.self,
         ]
     )
 }

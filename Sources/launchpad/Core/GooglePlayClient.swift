@@ -994,6 +994,82 @@ struct GooglePlayClient {
         }
     }
 
+    // MARK: - Orders
+
+    func getOrder(packageName: String, orderID: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let encoded = orderID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderID
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/orders/\(encoded)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    func refundOrder(packageName: String, orderID: String, revoke: Bool = false) async throws {
+        let token = try await accessToken()
+        let encoded = orderID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderID
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/orders/\(encoded):refund")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["revoke": revoke])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+    }
+
+    // MARK: - Store Listings
+
+    func listListings(packageName: String) async throws -> [[String: Any]] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        try await abandonEdit(packageName: packageName, editID: editID, token: token)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json["listings"] as? [[String: Any]] ?? []
+    }
+
+    func getListing(packageName: String, language: String) async throws -> [String: Any] {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/listings/\(language)")!
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        try await abandonEdit(packageName: packageName, editID: editID, token: token)
+        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return json
+    }
+
+    private func abandonEdit(packageName: String, editID: String, token: String) async throws {
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID):delete")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        _ = try await URLSession.shared.data(for: req)
+    }
+
     // MARK: - OAuth2
 
     private func accessToken() async throws -> String {
