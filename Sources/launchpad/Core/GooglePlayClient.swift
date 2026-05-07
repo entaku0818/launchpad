@@ -779,6 +779,31 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
+    // MARK: - Convert Region Prices
+
+    func convertRegionPrices(packageName: String, priceMicros: Int, currencyCode: String, regionCodes: [String]) async throws -> [String: [String: Any]] {
+        let accessTkn = try await accessToken()
+        let url = URL(string: "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/\(packageName)/pricing:convertRegionPrices")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(accessTkn)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "price": ["priceMicros": "\(priceMicros)", "currency": currencyCode],
+            "regionVersion": ["version": "2022/02"],
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let convertedPrices = json["convertedRegionPrices"] as? [String: [String: Any]] else {
+            throw LaunchpadError.invalidResponse
+        }
+        return convertedPrices
+    }
+
     // MARK: - Cancel Surveys
 
     func listCancelSurveyResults(packageName: String, subscriptionID: String) async throws -> [[String: Any]] {

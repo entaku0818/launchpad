@@ -781,6 +781,45 @@ struct ASCAPIClient {
         return infos.first ?? [:]
     }
 
+    // MARK: - In-App Purchases (ASC API)
+
+    func listInAppPurchases(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/apps/\(appID)/inAppPurchasesV2?limit=200&fields[inAppPurchases]=name,productID,inAppPurchaseType,state")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func getInAppPurchase(iapID: String) async throws -> [String: Any] {
+        let json = try await get("/inAppPurchasesV2/\(iapID)")
+        return json["data"] as? [String: Any] ?? [:]
+    }
+
+    func createInAppPurchase(appID: String, productID: String, name: String, iapType: String, reviewNote: String?) async throws -> String {
+        var attrs: [String: Any] = [
+            "productId": productID,
+            "referenceName": name,
+            "inAppPurchaseType": iapType,
+        ]
+        if let note = reviewNote { attrs["reviewNote"] = note }
+        let body: [String: Any] = [
+            "data": [
+                "type": "inAppPurchases",
+                "attributes": attrs,
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/inAppPurchasesV2", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteInAppPurchase(iapID: String) async throws {
+        try await delete("/inAppPurchasesV2/\(iapID)")
+    }
+
     // MARK: - Subscription Groups
 
     func getSubscriptionGroups(appID: String) async throws -> [[String: Any]] {

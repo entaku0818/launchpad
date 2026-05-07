@@ -41,6 +41,7 @@ struct IOSCommand: ParsableCommand {
             IOSAppInfoCommand.self,
             IOSBetaFeedbackCommand.self,
             IOSXcodeCloudCommand.self,
+            IOSIAPCommand.self,
             IOSTerritoriesCommand.self,
             IOSBetaLicenseCommand.self,
             IOSExperimentsCommand.self,
