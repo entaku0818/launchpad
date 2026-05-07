@@ -1110,6 +1110,46 @@ struct ASCAPIClient {
         try await delete("/inAppPurchasesV2/\(iapID)")
     }
 
+    // MARK: - Subscription Localizations
+
+    func listSubscriptionLocalizations(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/subscriptionLocalizations")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscriptionLocalization(subscriptionID: String, locale: String, name: String, description: String?) async throws -> String {
+        var attrs: [String: Any] = ["locale": locale, "name": name]
+        if let description { attrs["description"] = description }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionLocalizations",
+                "attributes": attrs,
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]]
+                ],
+            ]
+        ]
+        let response = try await post("/subscriptionLocalizations", body: body)
+        guard let d = response["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateSubscriptionLocalization(localizationID: String, name: String?, description: String?) async throws {
+        var attrs: [String: Any] = [:]
+        if let name        { attrs["name"] = name }
+        if let description { attrs["description"] = description }
+        let body: [String: Any] = [
+            "data": ["type": "subscriptionLocalizations", "id": localizationID, "attributes": attrs]
+        ]
+        _ = try await patch("/subscriptionLocalizations/\(localizationID)", body: body)
+    }
+
+    func deleteSubscriptionLocalization(localizationID: String) async throws {
+        try await delete("/subscriptionLocalizations/\(localizationID)")
+    }
+
     // MARK: - Subscription Images
 
     func listSubscriptionImages(subscriptionID: String) async throws -> [[String: Any]] {
