@@ -71,6 +71,7 @@ struct IOSCommand: ParsableCommand {
             IOSReviewDetailCommand.self,
             IOSPerfMetricsCommand.self,
             IOSNotarizeCommand.self,
+            IOSServerAPICommand.self,
         ]
     )
 }
