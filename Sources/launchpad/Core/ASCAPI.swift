@@ -710,6 +710,32 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - Pre-Order
+
+    func getPreOrder(appID: String) async throws -> [String: Any] {
+        let json = try await get("/apps/\(appID)/preOrder")
+        return json["data"] as? [String: Any] ?? [:]
+    }
+
+    func createPreOrder(appID: String, availableDate: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appPreOrders",
+                "attributes": [
+                    "appReleaseDate": availableDate,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        _ = try await post("/appPreOrders", body: body)
+    }
+
+    func cancelPreOrder(preOrderID: String) async throws {
+        try await delete("/appPreOrders/\(preOrderID)")
+    }
+
     // MARK: - Game Center
 
     func listLeaderboards(appID: String) async throws -> [[String: Any]] {
