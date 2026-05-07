@@ -710,6 +710,71 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - Game Center
+
+    func listLeaderboards(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/gameCenterLeaderboards?filter[app]=\(appID)&limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createLeaderboard(appID: String, referenceName: String, defaultFormatter: String, scoreSortType: String) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "gameCenterLeaderboards",
+                "attributes": [
+                    "referenceName": referenceName,
+                    "vendorIdentifier": referenceName,
+                    "defaultFormatter": defaultFormatter,
+                    "scoreSortType": scoreSortType,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/gameCenterLeaderboards", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteLeaderboard(leaderboardID: String) async throws {
+        try await delete("/gameCenterLeaderboards/\(leaderboardID)")
+    }
+
+    func listAchievements(appID: String) async throws -> [[String: Any]] {
+        let json = try await get("/gameCenterAchievements?filter[app]=\(appID)&limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func createAchievement(appID: String, referenceName: String, points: Int, repeatable: Bool) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "gameCenterAchievements",
+                "attributes": [
+                    "referenceName": referenceName,
+                    "vendorIdentifier": referenceName,
+                    "points": points,
+                    "repeatable": repeatable,
+                    "showBeforeEarned": true,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/gameCenterAchievements", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteAchievement(achievementID: String) async throws {
+        try await delete("/gameCenterAchievements/\(achievementID)")
+    }
+
     // MARK: - HTTP
 
     private func get(_ path: String) async throws -> [String: Any] {
