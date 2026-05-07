@@ -704,6 +704,23 @@ struct ASCAPIClient {
         try await delete("/appStoreVersionExperiments/\(experimentID)")
     }
 
+    // MARK: - Source Code Manager (SCM for Xcode Cloud)
+
+    func listSCMProviders() async throws -> [[String: Any]] {
+        let json = try await get("/scmProviders?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listSCMRepositories(providerID: String) async throws -> [[String: Any]] {
+        let json = try await get("/scmProviders/\(providerID)/repositories?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listSCMGitReferences(repositoryID: String) async throws -> [[String: Any]] {
+        let json = try await get("/scmRepositories/\(repositoryID)/gitReferences?limit=50")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Xcode Cloud (CI)
 
     func listCIProducts(appID: String) async throws -> [[String: Any]] {
