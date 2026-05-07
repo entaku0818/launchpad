@@ -1536,6 +1536,69 @@ struct ASCAPIClient {
         _ = try await post("/iapPriceSchedules", body: body)
     }
 
+    // MARK: - Subscription Availability & Prices
+
+    func getSubscriptionAvailability(subscriptionID: String) async throws -> [String: Any] {
+        let data = try await get("/subscriptions/\(subscriptionID)/subscriptionAvailability?include=availableTerritories")
+        return data["data"] as? [String: Any] ?? [:]
+    }
+
+    func createSubscriptionAvailability(subscriptionID: String, availableInNewTerritories: Bool, territoryCodes: [String]) async throws -> String {
+        let territories = territoryCodes.map { ["type": "territories", "id": $0] }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionAvailabilities",
+                "attributes": ["availableInNewTerritories": availableInNewTerritories],
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]],
+                    "availableTerritories": ["data": territories],
+                ]
+            ]
+        ]
+        let json = try await post("/subscriptionAvailabilities", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func listSubscriptionPrices(subscriptionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/subscriptions/\(subscriptionID)/prices?include=subscriptionPricePoint&limit=200")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func listSubscriptionPricePoints(subscriptionID: String, territory: String?) async throws -> [[String: Any]] {
+        var path = "/subscriptions/\(subscriptionID)/pricePoints?limit=200"
+        if let territory { path += "&filter[territory]=\(territory)" }
+        let data = try await get(path)
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func createSubscriptionPrice(subscriptionID: String, pricePointID: String, territory: String, startDate: String?) async throws -> String {
+        var attrs: [String: Any] = [:]
+        if let startDate { attrs["startDate"] = startDate }
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionPrices",
+                "attributes": attrs,
+                "relationships": [
+                    "subscription": ["data": ["type": "subscriptions", "id": subscriptionID]],
+                    "subscriptionPricePoint": ["data": ["type": "subscriptionPricePoints", "id": pricePointID]],
+                    "territory": ["data": ["type": "territories", "id": territory]],
+                ]
+            ]
+        ]
+        let json = try await post("/subscriptionPrices", body: body)
+        guard let d = json["data"] as? [String: Any], let id = d["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func deleteSubscriptionPrice(priceID: String) async throws {
+        try await delete("/subscriptionPrices/\(priceID)")
+    }
+
     // MARK: - Subscription Localizations
 
     func listSubscriptionLocalizations(subscriptionID: String) async throws -> [[String: Any]] {
