@@ -710,6 +710,20 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - Price Points
+
+    func listPricePoints(appID: String, territory: String? = nil) async throws -> [[String: Any]] {
+        var path = "/apps/\(appID)/appPricePoints?limit=200"
+        if let t = territory { path += "&filter[territory]=\(t)" }
+        let json = try await get(path)
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func listPriceTiers() async throws -> [[String: Any]] {
+        let json = try await get("/appPriceTiers?limit=200")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - API Keys
 
     func listAPIKeys() async throws -> [[String: Any]] {
