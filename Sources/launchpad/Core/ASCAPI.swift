@@ -710,6 +710,56 @@ struct ASCAPIClient {
         _ = try await patch("/appStoreVersions/\(versionID)/relationships/build", body: body)
     }
 
+    // MARK: - EULA (End User License Agreements)
+
+    func listEULAs() async throws -> [[String: Any]] {
+        let json = try await get("/endUserLicenseAgreements")
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
+    func getEULA(eulaID: String) async throws -> [String: Any] {
+        let json = try await get("/endUserLicenseAgreements/\(eulaID)")
+        return json["data"] as? [String: Any] ?? [:]
+    }
+
+    func createEULA(appID: String, agreementText: String, territories: [String]) async throws -> String {
+        let body: [String: Any] = [
+            "data": [
+                "type": "endUserLicenseAgreements",
+                "attributes": [
+                    "agreementText": agreementText,
+                    "territories": territories,
+                ],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]]
+                ]
+            ]
+        ]
+        let json = try await post("/endUserLicenseAgreements", body: body)
+        guard let data = json["data"] as? [String: Any], let id = data["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        return id
+    }
+
+    func updateEULA(eulaID: String, agreementText: String, territories: [String]) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "endUserLicenseAgreements",
+                "id": eulaID,
+                "attributes": [
+                    "agreementText": agreementText,
+                    "territories": territories,
+                ]
+            ]
+        ]
+        _ = try await patch("/endUserLicenseAgreements/\(eulaID)", body: body)
+    }
+
+    func deleteEULA(eulaID: String) async throws {
+        try await delete("/endUserLicenseAgreements/\(eulaID)")
+    }
+
     // MARK: - Pre-Order
 
     func getPreOrder(appID: String) async throws -> [String: Any] {

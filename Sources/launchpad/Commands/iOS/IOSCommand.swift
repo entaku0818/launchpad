@@ -34,6 +34,7 @@ struct IOSCommand: ParsableCommand {
             IOSTeamCommand.self,
             IOSGameCenterCommand.self,
             IOSPreOrderCommand.self,
+            IOSEULACommand.self,
         ]
     )
 }
