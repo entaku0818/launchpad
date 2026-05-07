@@ -73,6 +73,7 @@ struct IOSCommand: ParsableCommand {
             IOSNotarizeCommand.self,
             IOSServerAPICommand.self,
             IOSSearchAdsCommand.self,
+            IOSASOCommand.self,
         ]
     )
 }

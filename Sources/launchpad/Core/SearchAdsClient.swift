@@ -196,6 +196,18 @@ struct SearchAdsClient {
         return json["data"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Keyword Suggestions
+
+    func keywordSuggestions(adamID: Int, countryCodes: [String] = ["JP"], competitorAdamIDs: [Int] = []) async throws -> [[String: Any]] {
+        var targeting: [String: Any] = ["includedCountriesOrRegions": countryCodes]
+        if !competitorAdamIDs.isEmpty {
+            targeting["targetedKeywords"] = competitorAdamIDs.map { ["adamId": $0] }
+        }
+        let body: [String: Any] = ["adamId": adamID, "targeting": targeting]
+        let json = try await post("/keywords/targeting/suggestions", body: body)
+        return json["data"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - OAuth2 token
 
     private func accessToken() async throws -> String {
