@@ -7,7 +7,7 @@ struct Launchpad: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "launchpad",
         abstract: "Personal iOS/Android release tool",
-        subcommands: [InitCommand.self, IOSCommand.self, AndroidCommand.self, ReleaseNotesCommand.self, ReleaseCommand.self]
+        subcommands: [InitCommand.self, IOSCommand.self, AndroidCommand.self, ReleaseNotesCommand.self, ReleaseCommand.self, DoctorCommand.self]
     )
 
     static func main() async {
