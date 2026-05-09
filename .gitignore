@@ -6,3 +6,10 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# launchpad project secrets — never commit these
+.env
+.launchpadrc
+*.p8
+*.keystore
+*.jks
