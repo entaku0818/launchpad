@@ -9,6 +9,7 @@ struct IOSPricingCommand: AsyncParsableCommand {
             IOSPricingShowCommand.self,
             IOSPricingTerritoriesCommand.self,
             IOSPricingSetCommand.self,
+            IOSPricingSetFreeCommand.self,
         ]
     )
 }
@@ -116,6 +117,24 @@ struct IOSPricingSetCommand: AsyncParsableCommand {
         Logger.step("Setting price to point \(pricePointID) for \(bid)")
         try await client.setAppPriceSchedule(appID: appID, pricePointID: pricePointID, startDate: startDate)
         Logger.success("Price updated")
+    }
+}
+
+struct IOSPricingSetFreeCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set-free", abstract: "Set app price to free (no cost to users)")
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id required"); Foundation.exit(1) }()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        Logger.step("Setting \(bid) as free")
+        try await client.setAppFree(appID: appID)
+        Logger.success("App price set to free")
     }
 }
 

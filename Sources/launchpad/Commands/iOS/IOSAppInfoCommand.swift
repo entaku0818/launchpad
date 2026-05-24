@@ -11,6 +11,7 @@ struct IOSAppInfoCommand: AsyncParsableCommand {
             IOSAppInfoSetLocaleCommand.self,
             IOSAppInfoCreateLocaleCommand.self,
             IOSAppInfoDeleteLocaleCommand.self,
+            IOSAppInfoSetContentRightsCommand.self,
         ]
     )
 }
@@ -132,6 +133,27 @@ struct IOSAppInfoDeleteLocaleCommand: AsyncParsableCommand {
         Logger.step("Deleting app info localization \(localizationID)")
         try await client.deleteAppInfoLocalization(localizationID: localizationID)
         Logger.success("Locale deleted")
+    }
+}
+
+struct IOSAppInfoSetContentRightsCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "set-content-rights", abstract: "Set contentRightsDeclaration on the app (required before submission)")
+
+    @Option(name: .long, help: "App bundle ID [config: ios.bundleId]")
+    var bundleID: String?
+
+    @Flag(name: .long, help: "App uses third-party content (default: does NOT use)")
+    var usesThirdPartyContent: Bool = false
+
+    mutating func run() async throws {
+        DotEnv.load()
+        let cfg = Config.load().ios
+        let bid = bundleID ?? cfg?.bundleId ?? { Logger.error("--bundle-id or ios.bundleId required"); Foundation.exit(1) }()
+        let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
+        let appID = try await client.findApp(bundleID: bid)
+        Logger.step("Setting contentRightsDeclaration for \(bid)")
+        try await client.updateAppContentRights(appID: appID, doesNotUseThirdPartyContent: !usesThirdPartyContent)
+        Logger.success("contentRightsDeclaration set to \(usesThirdPartyContent ? "USES_THIRD_PARTY_CONTENT" : "DOES_NOT_USE_THIRD_PARTY_CONTENT")")
     }
 }
 

@@ -74,11 +74,12 @@ struct IOSVersionsListCommand: AsyncParsableCommand {
         if versions.isEmpty { Logger.info("No versions found"); return }
         for v in versions {
             guard let attrs = v["attributes"] as? [String: Any] else { continue }
+            let id       = v["id"] as? String ?? "-"
             let ver      = attrs["versionString"] as? String ?? "-"
             let state    = attrs["appStoreState"] as? String ?? "-"
             let platform = attrs["platform"] as? String ?? "-"
             let created  = attrs["createdDate"] as? String ?? "-"
-            print("  \(ver)  [\(state)]  \(platform)  created: \(created)")
+            print("  \(ver)  [\(state)]  \(platform)  id: \(id)  created: \(created)")
         }
     }
 }
@@ -130,6 +131,9 @@ struct IOSVersionsUpdateCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Mark as NOT using non-exempt encryption")
     var noEncryption: Bool = false
 
+    @Option(name: .long, help: "Copyright text (e.g. '2026 Your Name')")
+    var copyright: String?
+
     mutating func run() async throws {
         DotEnv.load()
         let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
@@ -142,6 +146,9 @@ struct IOSVersionsUpdateCommand: AsyncParsableCommand {
             earliestReleaseDate: earliestReleaseDate,
             usesNonExemptEncryption: encryptionFlag
         )
+        if let copyright {
+            try await client.updateVersionCopyright(versionID: versionID, copyright: copyright)
+        }
         Logger.success("Version updated")
     }
 }

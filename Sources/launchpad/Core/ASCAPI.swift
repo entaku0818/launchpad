@@ -406,24 +406,75 @@ struct ASCAPIClient {
     }
 
     func setAppPriceSchedule(appID: String, pricePointID: String, startDate: String?) async throws {
-        var manualPrice: [String: Any] = [
+        var includedAttrs: [String: Any] = [:]
+        if let sd = startDate { includedAttrs["startDate"] = sd }
+        let included: [[String: Any]] = [[
             "type": "appPrices",
-            "attributes": ["startDate": startDate as Any],
+            "id": "${price1}",
+            "attributes": includedAttrs,
             "relationships": [
                 "appPricePoint": ["data": ["type": "appPricePoints", "id": pricePointID]]
             ]
-        ]
-        if startDate == nil { manualPrice["attributes"] = [:] as [String: Any] }
+        ]]
         let body: [String: Any] = [
             "data": [
                 "type": "appPriceSchedules",
                 "relationships": [
                     "app": ["data": ["type": "apps", "id": appID]],
-                    "manualPrices": ["data": [manualPrice]]
+                    "baseTerritory": ["data": ["type": "territories", "id": "USA"]],
+                    "manualPrices": ["data": [["type": "appPrices", "id": "${price1}"]]]
+                ]
+            ],
+            "included": included
+        ]
+        _ = try await post("/appPriceSchedules", body: body)
+    }
+
+    func setAppFree(appID: String) async throws {
+        let points = try await listPricePoints(appID: appID, territory: "USA")
+        guard let freePoint = points.first(where: {
+            if let attrs = $0["attributes"] as? [String: Any],
+               let price = attrs["customerPrice"] as? String { return price == "0.0" || price == "0.00" }
+            return false
+        }), let freeID = freePoint["id"] as? String else {
+            throw LaunchpadError.invalidResponse
+        }
+        try await setAppPriceSchedule(appID: appID, pricePointID: freeID, startDate: nil)
+    }
+
+    func updateAgeRatingDeclaration(declarationID: String, attributes: [String: Any]) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "ageRatingDeclarations",
+                "id": declarationID,
+                "attributes": attributes
+            ]
+        ]
+        _ = try await patch("/ageRatingDeclarations/\(declarationID)", body: body)
+    }
+
+    func updateAppContentRights(appID: String, doesNotUseThirdPartyContent: Bool) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "apps",
+                "id": appID,
+                "attributes": [
+                    "contentRightsDeclaration": doesNotUseThirdPartyContent ? "DOES_NOT_USE_THIRD_PARTY_CONTENT" : "USES_THIRD_PARTY_CONTENT"
                 ]
             ]
         ]
-        _ = try await post("/appPriceSchedules", body: body)
+        _ = try await patch("/apps/\(appID)", body: body)
+    }
+
+    func updateVersionCopyright(versionID: String, copyright: String) async throws {
+        let body: [String: Any] = [
+            "data": [
+                "type": "appStoreVersions",
+                "id": versionID,
+                "attributes": ["copyright": copyright]
+            ]
+        ]
+        _ = try await patch("/appStoreVersions/\(versionID)", body: body)
     }
 
     func updateBetaGroup(groupID: String, publicLinkEnabled: Bool?, feedbackEnabled: Bool?) async throws {
@@ -933,7 +984,7 @@ struct ASCAPIClient {
     }
 
     func listAppStoreVersions(appID: String) async throws -> [[String: Any]] {
-        let data = try await get("/apps/\(appID)/appStoreVersions?fields[appStoreVersions]=versionString,appStoreState,platform,createdDate&limit=10&sort=-createdDate")
+        let data = try await get("/apps/\(appID)/appStoreVersions?fields[appStoreVersions]=versionString,appStoreState,platform,createdDate&limit=10")
         return data["data"] as? [[String: Any]] ?? []
     }
 
@@ -1034,7 +1085,7 @@ struct ASCAPIClient {
     // MARK: - Age Rating
 
     func getAgeRatingDeclaration(versionID: String) async throws -> [String: Any] {
-        let data = try await get("/appStoreVersions/\(versionID)/ageRatingDeclaration")
+        let data = try await get("/ageRatingDeclarations/\(versionID)")
         return data["data"] as? [String: Any] ?? [:]
     }
 
@@ -1552,9 +1603,27 @@ struct ASCAPIClient {
     // MARK: - App Categories
 
     func getAppInfo(appID: String) async throws -> [String: Any] {
-        let data = try await get("/apps/\(appID)/appInfos?include=primaryCategory,secondaryCategory&limit=1")
+        let data = try await get("/apps/\(appID)/appInfos?include=primaryCategory,secondaryCategory,ageRatingDeclaration&limit=1")
         guard let infos = data["data"] as? [[String: Any]] else { throw LaunchpadError.invalidResponse }
         return infos.first ?? [:]
+    }
+
+    func getAgeRatingDeclarationIDFromAppInfo(appID: String) async throws -> String? {
+        let data = try await get("/apps/\(appID)/appInfos?include=ageRatingDeclaration&limit=1")
+        let included = data["included"] as? [[String: Any]] ?? []
+        if let decl = included.first(where: { ($0["type"] as? String) == "ageRatingDeclarations" }),
+           let id = decl["id"] as? String {
+            return id
+        }
+        // Fallback: try via appInfo relationships
+        if let infos = data["data"] as? [[String: Any]],
+           let first = infos.first,
+           let rels = first["relationships"] as? [String: Any],
+           let ard = (rels["ageRatingDeclaration"] as? [String: Any])?["data"] as? [String: Any],
+           let id = ard["id"] as? String {
+            return id
+        }
+        return nil
     }
 
     func updateAppInfo(appInfoID: String, primaryLocale: String?, primaryCategoryID: String?, secondaryCategoryID: String?) async throws {
@@ -2102,6 +2171,24 @@ struct ASCAPIClient {
         return data["data"] as? [[String: Any]] ?? []
     }
 
+    func getReviewSubmissionItems(submissionID: String) async throws -> [[String: Any]] {
+        let data = try await get("/reviewSubmissions/\(submissionID)/items")
+        return data["data"] as? [[String: Any]] ?? []
+    }
+
+    func addItemToReviewSubmission(submissionID: String, versionID: String) async throws {
+        let itemBody: [String: Any] = [
+            "data": [
+                "type": "reviewSubmissionItems",
+                "relationships": [
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]],
+                    "reviewSubmission": ["data": ["type": "reviewSubmissions", "id": submissionID]]
+                ]
+            ]
+        ]
+        _ = try await post("/reviewSubmissionItems", body: itemBody)
+    }
+
     // MARK: - Routing App Coverage
 
     func getRoutingAppCoverage(versionID: String) async throws -> [String: Any]? {
@@ -2196,18 +2283,55 @@ struct ASCAPIClient {
 
     // MARK: - Submit for Review
 
-    func submitForReview(versionID: String) async throws {
-        let body: [String: Any] = [
-            "data": [
-                "type": "appStoreVersionSubmissions",
-                "relationships": [
-                    "appStoreVersion": [
-                        "data": ["type": "appStoreVersions", "id": versionID]
+    func submitForReview(appID: String, versionID: String) async throws {
+        // Find or create a review submission
+        let existingData = try await get("/apps/\(appID)/reviewSubmissions?filter[platform]=IOS&filter[state]=READY_FOR_REVIEW&limit=1")
+        let submissionID: String
+        if let existing = (existingData["data"] as? [[String: Any]])?.first,
+           let eid = existing["id"] as? String {
+            submissionID = eid
+            // Check if this submission already has our version item; add if not
+            let items = try await getReviewSubmissionItems(submissionID: submissionID)
+            let hasOurVersion = items.contains(where: { item in
+                if let rels = item["relationships"] as? [String: Any],
+                   let verRel = rels["appStoreVersion"] as? [String: Any],
+                   let data = verRel["data"] as? [String: Any],
+                   let id = data["id"] as? String {
+                    return id == versionID
+                }
+                return false
+            })
+            if !hasOurVersion {
+                try await addItemToReviewSubmission(submissionID: submissionID, versionID: versionID)
+            }
+        } else {
+            // Create new review submission
+            let createBody: [String: Any] = [
+                "data": [
+                    "type": "reviewSubmissions",
+                    "attributes": ["platform": "IOS"],
+                    "relationships": [
+                        "app": ["data": ["type": "apps", "id": appID]]
                     ]
-                ],
+                ]
+            ]
+            let submissionResp = try await post("/reviewSubmissions", body: createBody)
+            guard let sid = (submissionResp["data"] as? [String: Any])?["id"] as? String else {
+                throw LaunchpadError.invalidResponse
+            }
+            submissionID = sid
+            try await addItemToReviewSubmission(submissionID: submissionID, versionID: versionID)
+        }
+
+        // Submit for review
+        let submitBody: [String: Any] = [
+            "data": [
+                "type": "reviewSubmissions",
+                "id": submissionID,
+                "attributes": ["state": "SUBMITTED"]
             ]
         ]
-        _ = try await post("/appStoreVersionSubmissions", body: body)
+        _ = try await patch("/reviewSubmissions/\(submissionID)", body: submitBody)
     }
 
     // MARK: - Build

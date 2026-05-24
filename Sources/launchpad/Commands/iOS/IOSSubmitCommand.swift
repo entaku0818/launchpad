@@ -45,7 +45,7 @@ struct IOSSubmitCommand: AsyncParsableCommand {
         let versionID = try await client.getAppStoreVersion(appID: appID, version: ver)
 
         Logger.step("Submitting for review")
-        try await client.submitForReview(versionID: versionID)
+        try await client.submitForReview(appID: appID, versionID: versionID)
 
         Logger.success("\(bid) v\(ver) submitted for review!")
     }

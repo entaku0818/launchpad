@@ -57,6 +57,18 @@ private func formatAPIError(code: Int, body: String) -> String {
         if !apiCode.isEmpty { msg += " [\(apiCode)]" }
         if !title.isEmpty   { msg += ": \(title)" }
         if !detail.isEmpty  { msg += "\n\(detail)" }
+        if let meta = first["meta"] as? [String: Any],
+           let associated = meta["associatedErrors"] as? [String: Any] {
+            for (key, val) in associated {
+                if let errs = val as? [[String: Any]] {
+                    for e in errs {
+                        let aTitle  = e["title"] as? String ?? ""
+                        let aDetail = e["detail"] as? String ?? ""
+                        msg += "\n  [\(key)] \(aTitle): \(aDetail)"
+                    }
+                }
+            }
+        }
         return msg
     }
     // Search Ads / other APIs may use a different shape
