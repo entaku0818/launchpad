@@ -15,7 +15,7 @@ App Store Connect API・Google Play Developer API・Apple Search Ads API を Swi
 
 - macOS 13 以上
 - Xcode（iOS ビルドを行う場合）
-- Swift 5.9 以上
+- Swift 6.0 以上
 
 ## インストール
 
