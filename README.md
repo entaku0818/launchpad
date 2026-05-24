@@ -19,22 +19,34 @@ App Store Connect API・Google Play Developer API・Apple Search Ads API を Swi
 
 ## インストール
 
-### Mint（推奨）
-
-[Mint](https://github.com/yonaskolb/Mint) は Swift 製 CLI ツール向けのパッケージマネージャーです。追加リポジトリ不要でインストールできます。
+### curl（最速・Swift 不要）
 
 ```bash
-# Mint 自体を先にインストール
-brew install mint
-
-# launchpad をインストール
-mint install entaku0818/launchpad
-
-# バージョンを指定する場合
-mint install entaku0818/launchpad@v1.0.0
+curl -fsSL https://raw.githubusercontent.com/entaku0818/launchpad/main/install.sh | sh
 ```
 
-アップデートは同じコマンドを再実行するだけです。
+universal binary（Apple Silicon / Intel 両対応）を自動でダウンロードして `/usr/local/bin` に配置します。
+
+### Homebrew
+
+```bash
+brew tap entaku0818/launchpad
+brew install launchpad
+```
+
+アップデート：
+```bash
+brew upgrade launchpad
+```
+
+### Mint
+
+[Mint](https://github.com/yonaskolb/Mint) は Swift 製 CLI ツール向けのパッケージマネージャーです。
+
+```bash
+brew install mint
+mint install entaku0818/launchpad
+```
 
 ### ソースからビルド
 

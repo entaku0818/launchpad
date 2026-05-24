@@ -21,22 +21,34 @@ Wraps the App Store Connect API, Google Play Developer API, and Apple Search Ads
 
 ## Installation
 
-### Mint (recommended)
-
-[Mint](https://github.com/yonaskolb/Mint) is a package manager for Swift CLI tools. No extra repository needed.
+### curl (fastest — no Swift required)
 
 ```bash
-# Install Mint first
-brew install mint
-
-# Install launchpad
-mint install entaku0818/launchpad
-
-# Pin to a specific version
-mint install entaku0818/launchpad@v1.0.0
+curl -fsSL https://raw.githubusercontent.com/entaku0818/launchpad/main/install.sh | sh
 ```
 
-To update, just re-run the install command.
+Downloads a pre-built universal binary (Apple Silicon + Intel) and installs it to `/usr/local/bin`.
+
+### Homebrew
+
+```bash
+brew tap entaku0818/launchpad
+brew install launchpad
+```
+
+To update:
+```bash
+brew upgrade launchpad
+```
+
+### Mint
+
+[Mint](https://github.com/yonaskolb/Mint) is a package manager for Swift CLI tools.
+
+```bash
+brew install mint
+mint install entaku0818/launchpad
+```
 
 ### Build from source
 
