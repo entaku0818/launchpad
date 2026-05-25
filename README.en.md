@@ -29,18 +29,6 @@ curl -fsSL https://raw.githubusercontent.com/entaku0818/launchpad/main/install.s
 
 Downloads a pre-built universal binary (Apple Silicon + Intel) and installs it to `/usr/local/bin`.
 
-### Homebrew
-
-```bash
-brew tap entaku0818/launchpad
-brew install launchpad
-```
-
-To update:
-```bash
-brew upgrade launchpad
-```
-
 ### Mint
 
 [Mint](https://github.com/yonaskolb/Mint) is a package manager for Swift CLI tools.

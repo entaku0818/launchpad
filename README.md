@@ -27,18 +27,6 @@ curl -fsSL https://raw.githubusercontent.com/entaku0818/launchpad/main/install.s
 
 universal binary（Apple Silicon / Intel 両対応）を自動でダウンロードして `/usr/local/bin` に配置します。
 
-### Homebrew
-
-```bash
-brew tap entaku0818/launchpad
-brew install launchpad
-```
-
-アップデート：
-```bash
-brew upgrade launchpad
-```
-
 ### Mint
 
 [Mint](https://github.com/yonaskolb/Mint) は Swift 製 CLI ツール向けのパッケージマネージャーです。
