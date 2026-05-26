@@ -6,7 +6,6 @@ set -e
 
 REPO="entaku0818/launchpad"
 BINARY="launchpad"
-INSTALL_DIR="/usr/local/bin"
 
 # Detect latest version
 VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
@@ -26,13 +25,26 @@ echo "Installing launchpad ${VERSION}..."
 curl -fsSL "$URL" -o "${TMP_DIR}/${TARBALL}"
 tar -xzf "${TMP_DIR}/${TARBALL}" -C "$TMP_DIR"
 
-if [ ! -w "$INSTALL_DIR" ]; then
-  sudo install -m 755 "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+# Determine install directory: prefer /usr/local/bin, fall back to ~/.local/bin
+if [ -w "/usr/local/bin" ]; then
+  INSTALL_DIR="/usr/local/bin"
 else
-  install -m 755 "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+  INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR"
 fi
 
+install -m 755 "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 rm -rf "$TMP_DIR"
 
 echo "✓ launchpad ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
-launchpad --version 2>/dev/null || true
+
+# Warn if install dir is not in PATH
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    echo ""
+    echo "  Note: ${INSTALL_DIR} is not in your PATH."
+    echo "  Add this to your shell profile (~/.zshrc or ~/.bashrc):"
+    echo "    export PATH=\"\$PATH:${INSTALL_DIR}\""
+    ;;
+esac
