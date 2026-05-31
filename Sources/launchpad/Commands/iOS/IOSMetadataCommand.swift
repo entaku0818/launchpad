@@ -73,7 +73,10 @@ struct IOSMetadataCommand: AsyncParsableCommand {
             for (file, key) in fields {
                 let filePath = "\(localeDir)/\(file)"
                 if let text = try? String(contentsOfFile: filePath, encoding: .utf8) {
-                    updates[key] = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        updates[key] = trimmed
+                    }
                 }
             }
 
