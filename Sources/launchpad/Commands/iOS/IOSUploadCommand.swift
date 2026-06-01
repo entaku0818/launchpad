@@ -33,7 +33,8 @@ struct IOSUploadCommand: ParsableCommand {
         _ = try creds.writeKeyFile()
 
         Logger.step("Uploading \(ipaPath)")
-        try Shell.runLive([
+        // altool sometimes exits 0 even on failure; use runCombined to capture stderr and detect "UPLOAD FAILED"
+        let output = try Shell.runCombined([
             "xcrun", "altool",
             "--upload-app",
             "-f", ipaPath,
@@ -41,7 +42,10 @@ struct IOSUploadCommand: ParsableCommand {
             "--apiIssuer", creds.issuerID,
             "--type", "ios",
         ])
-
+        print(output)
+        if output.contains("UPLOAD FAILED") || output.contains("Failed to upload") {
+            throw LaunchpadError.commandFailed("altool --upload-app", 1)
+        }
         Logger.success("Upload complete.")
     }
 }

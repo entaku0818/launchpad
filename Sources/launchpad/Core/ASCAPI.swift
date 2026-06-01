@@ -41,6 +41,16 @@ struct ASCAPIClient {
             let versions = data["data"] as? [[String: Any]],
             let id = versions.first?["id"] as? String
         else {
+            // Check if version exists in any state to give a more helpful error
+            let anyData = try? await get(
+                "/apps/\(appID)/appStoreVersions?filter[platform]=IOS&filter[versionString]=\(encoded)&fields[appStoreVersions]=appStoreState"
+            )
+            if let anyVersions = anyData?["data"] as? [[String: Any]],
+               let first = anyVersions.first,
+               let attrs = first["attributes"] as? [String: Any],
+               let state = attrs["appStoreState"] as? String {
+                throw LaunchpadError.versionNotFound("\(version) (current state: \(state) — not editable)")
+            }
             throw LaunchpadError.versionNotFound(version)
         }
         return id

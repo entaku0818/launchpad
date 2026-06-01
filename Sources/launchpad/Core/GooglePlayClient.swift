@@ -6,13 +6,19 @@ struct GooglePlayClient {
     private let baseURL = "https://androidpublisher.googleapis.com/androidpublisher/v3"
 
     static func fromEnvironment() throws -> GooglePlayClient {
-        guard let json = ProcessInfo.processInfo.environment["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"] else {
+        guard let raw = ProcessInfo.processInfo.environment["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"] else {
             throw LaunchpadError.missingEnvironmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
         }
-        guard
-            let data = json.data(using: .utf8),
-            let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        // Support both inline JSON and a path to a JSON file
+        let data: Data
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.hasPrefix("{") {
+            let path = (trimmed as NSString).expandingTildeInPath
+            data = (try? Data(contentsOf: URL(fileURLWithPath: path))) ?? Data(trimmed.utf8)
+        } else {
+            data = Data(trimmed.utf8)
+        }
+        guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw LaunchpadError.invalidResponse
         }
         return GooglePlayClient(serviceAccountJSON: dict)
@@ -1059,12 +1065,20 @@ struct GooglePlayClient {
         let srcURL = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(from)")!
         var srcReq = URLRequest(url: srcURL)
         srcReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (srcData, _) = try await URLSession.shared.data(for: srcReq)
+        let (srcData, srcResponse) = try await URLSession.shared.data(for: srcReq)
+        if let http = srcResponse as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: srcData, encoding: .utf8) ?? "")
+        }
         guard
             let srcJSON = try JSONSerialization.jsonObject(with: srcData) as? [String: Any],
             let releases = srcJSON["releases"] as? [[String: Any]],
+            !releases.isEmpty,
             let versionCodes = releases.first?["versionCodes"] as? [Int]
-        else { throw LaunchpadError.invalidResponse }
+        else {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(0, "No releases found in '\(from)' track. Upload a build first.")
+        }
 
         try await updateTrack(
             packageName: packageName,
@@ -1447,12 +1461,16 @@ struct GooglePlayClient {
         request.httpBody = "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=\(jwt)"
             .data(using: .utf8)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
         guard
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let token = json["access_token"] as? String
         else {
-            throw LaunchpadError.invalidResponse
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw LaunchpadError.apiError(0, "OAuth token exchange failed: \(body)")
         }
         return token
     }
@@ -1466,7 +1484,10 @@ struct GooglePlayClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: [:])
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
         guard
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let id = json["id"] as? String
@@ -1481,7 +1502,10 @@ struct GooglePlayClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         req.httpBody = try Data(contentsOf: URL(fileURLWithPath: aabPath))
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
         guard
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
             let versionCode = json["versionCode"] as? Int
