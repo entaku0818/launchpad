@@ -18,4 +18,6 @@ disabled_rules:
   - colon
   - for_where
   - redundant_optional_initialization
+  - implicit_optional_initialization # renamed from redundant_optional_initialization in newer SwiftLint
+  - non_optional_string_data_conversion
   - large_tuple
