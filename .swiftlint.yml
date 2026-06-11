@@ -1,0 +1,21 @@
+included:
+  - Sources
+
+# Rules below are disabled because the existing codebase violates them.
+# Re-enable incrementally when cleaning up.
+disabled_rules:
+  - line_length
+  - identifier_name
+  - trailing_comma
+  - comma
+  - opening_brace
+  - function_body_length
+  - type_name
+  - cyclomatic_complexity
+  - function_parameter_count
+  - file_length
+  - type_body_length
+  - colon
+  - for_where
+  - redundant_optional_initialization
+  - large_tuple
