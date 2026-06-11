@@ -10,7 +10,7 @@ jobs:
     name: Build (SwiftPM)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Swift version
         run: swift --version
       - name: Build
@@ -20,7 +20,7 @@ jobs:
     name: SwiftLint
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install SwiftLint
         run: which swiftlint || brew install swiftlint
       - name: Lint
