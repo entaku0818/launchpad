@@ -9,6 +9,7 @@ enum LaunchpadError: Error, LocalizedError {
     case buildNotFound
     case apiError(Int, String)
     case invalidResponse
+    case unsupported(String)
 
     var errorDescription: String? {
         switch self {
@@ -41,6 +42,8 @@ enum LaunchpadError: Error, LocalizedError {
             return formatAPIError(code: code, body: body)
         case .invalidResponse:
             return "Unexpected response format from the API. The API may have returned an error without a proper status code."
+        case .unsupported(let reason):
+            return reason
         }
     }
 }
