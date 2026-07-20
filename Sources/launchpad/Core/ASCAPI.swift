@@ -2333,12 +2333,14 @@ struct ASCAPIClient {
             try await addItemToReviewSubmission(submissionID: submissionID, versionID: versionID)
         }
 
-        // Submit for review
+        // Submit for review. `state` is a read-only/computed attribute and cannot be
+        // set directly (ASC returns 409 ENTITY_ERROR.ATTRIBUTE.NOT_ALLOWED). The
+        // documented way to trigger the SUBMITTED transition is `submitted: true`.
         let submitBody: [String: Any] = [
             "data": [
                 "type": "reviewSubmissions",
                 "id": submissionID,
-                "attributes": ["state": "SUBMITTED"]
+                "attributes": ["submitted": true]
             ]
         ]
         _ = try await patch("/reviewSubmissions/\(submissionID)", body: submitBody)

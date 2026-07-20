@@ -13,59 +13,33 @@ struct AndroidPublishingCommand: AsyncParsableCommand {
     )
 }
 
+private let managedPublishingUnsupportedMessage = """
+Managed Publishing is not exposed by the Google Play Developer API — there is no \
+`managedPublishing` endpoint in the current androidpublisher v3 discovery document. \
+This is a Play Console UI-only feature and cannot be controlled from launchpad. \
+Toggle it manually in Play Console under Setup > Advanced settings > Publishing overview.
+"""
+
 struct AndroidPublishingStatusCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "status", abstract: "Show managed publishing status")
 
-    @Option(name: .long, help: "Package name [config: android.packageName]")
-    var packageName: String?
-
     mutating func run() async throws {
-        DotEnv.load()
-        let cfg = Config.load().android
-        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
-
-        let client = try GooglePlayClient.fromEnvironment()
-        Logger.step("Fetching publishing settings for \(pkg)")
-        let info = try await client.getManagedPublishing(packageName: pkg)
-
-        let autoPublish = info["isAutoPublishEnabled"] as? Bool ?? true
-        let mode = autoPublish ? "Auto-publish (changes go live immediately after review)" : "Managed (manual publish required)"
-        print("\nPublishing mode: \(mode)")
+        throw LaunchpadError.unsupported(managedPublishingUnsupportedMessage)
     }
 }
 
 struct AndroidPublishingEnableCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "enable", abstract: "Enable managed publishing (require manual publish)")
 
-    @Option(name: .long, help: "Package name [config: android.packageName]")
-    var packageName: String?
-
     mutating func run() async throws {
-        DotEnv.load()
-        let cfg = Config.load().android
-        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
-
-        let client = try GooglePlayClient.fromEnvironment()
-        Logger.step("Enabling managed publishing for \(pkg)")
-        try await client.setManagedPublishing(packageName: pkg, enabled: true)
-        Logger.success("Managed publishing enabled — changes will not go live until manually published")
+        throw LaunchpadError.unsupported(managedPublishingUnsupportedMessage)
     }
 }
 
 struct AndroidPublishingDisableCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "disable", abstract: "Disable managed publishing (auto-publish after review)")
 
-    @Option(name: .long, help: "Package name [config: android.packageName]")
-    var packageName: String?
-
     mutating func run() async throws {
-        DotEnv.load()
-        let cfg = Config.load().android
-        let pkg = packageName ?? cfg?.packageName ?? { Logger.error("--package-name or android.packageName required"); Foundation.exit(1) }()
-
-        let client = try GooglePlayClient.fromEnvironment()
-        Logger.step("Disabling managed publishing for \(pkg)")
-        try await client.setManagedPublishing(packageName: pkg, enabled: false)
-        Logger.success("Auto-publish enabled — changes go live immediately after review")
+        throw LaunchpadError.unsupported(managedPublishingUnsupportedMessage)
     }
 }

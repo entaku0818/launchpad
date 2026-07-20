@@ -102,12 +102,22 @@ struct GooglePlayClient {
         let srcURL = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(track)")!
         var srcReq = URLRequest(url: srcURL)
         srcReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (srcData, _) = try await URLSession.shared.data(for: srcReq)
+        let (srcData, srcResponse) = try await URLSession.shared.data(for: srcReq)
+        if let http = srcResponse as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: srcData, encoding: .utf8) ?? "")
+        }
         guard
             let srcJSON = try JSONSerialization.jsonObject(with: srcData) as? [String: Any],
-            let releases = srcJSON["releases"] as? [[String: Any]],
-            let existingRelease = releases.first,
-            let versionCodes = existingRelease["versionCodes"] as? [Int]
+            let releases = srcJSON["releases"] as? [[String: Any]]
+        else { throw LaunchpadError.invalidResponse }
+
+        // versionCodes come back from the API as an array of strings (e.g. ["16"]),
+        // not numbers — casting straight to [Int] always fails and throws invalidResponse.
+        // Pick the release actively being staged (not one already "completed"); if every
+        // release is already completed, fall back to the first one.
+        guard
+            let existingRelease = releases.first(where: { ($0["status"] as? String) != "completed" }) ?? releases.first,
+            let versionCodes = existingRelease["versionCodes"] as? [String]
         else { throw LaunchpadError.invalidResponse }
 
         let fraction = min(max(percentage / 100.0, 0.0), 1.0)
@@ -123,7 +133,10 @@ struct GooglePlayClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        _ = try await URLSession.shared.data(for: req)
+        let (putData, putResponse) = try await URLSession.shared.data(for: req)
+        if let http = putResponse as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: putData, encoding: .utf8) ?? "")
+        }
 
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
@@ -702,34 +715,6 @@ struct GooglePlayClient {
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
 
-    // MARK: - Managed Publishing
-
-    func getManagedPublishing(packageName: String) async throws -> [String: Any] {
-        let token = try await accessToken()
-        let url = URL(string: "\(baseURL)/applications/\(packageName)/managedPublishing")!
-        var req = URLRequest(url: url)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: req)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw LaunchpadError.invalidResponse
-        }
-        return json
-    }
-
-    func setManagedPublishing(packageName: String, enabled: Bool) async throws {
-        let token = try await accessToken()
-        let url = URL(string: "\(baseURL)/applications/\(packageName)/managedPublishing")!
-        var req = URLRequest(url: url)
-        req.httpMethod = "PATCH"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["isAutoPublishEnabled": !enabled])
-        let (data, response) = try await URLSession.shared.data(for: req)
-        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
-        }
-    }
-
     func publishEdit(packageName: String) async throws {
         let token = try await accessToken()
         let editID = try await createEdit(packageName: packageName, token: token)
@@ -1074,7 +1059,9 @@ struct GooglePlayClient {
             let srcJSON = try JSONSerialization.jsonObject(with: srcData) as? [String: Any],
             let releases = srcJSON["releases"] as? [[String: Any]],
             !releases.isEmpty,
-            let versionCodes = releases.first?["versionCodes"] as? [Int]
+            // versionCodes come back from the API as an array of strings (e.g. ["16"]), not numbers.
+            let versionCodes = (releases.first?["versionCodes"] as? [String])?.compactMap({ Int($0) }),
+            let versionCode = versionCodes.last
         else {
             try await abandonEdit(packageName: packageName, editID: editID, token: token)
             throw LaunchpadError.apiError(0, "No releases found in '\(from)' track. Upload a build first.")
@@ -1084,7 +1071,7 @@ struct GooglePlayClient {
             packageName: packageName,
             editID: editID,
             track: to,
-            versionCode: versionCodes.last ?? 0,
+            versionCode: versionCode,
             token: token
         )
         try await commitEdit(packageName: packageName, editID: editID, token: token)
@@ -1244,54 +1231,85 @@ struct GooglePlayClient {
         }
     }
 
-    // MARK: - Bundle Listings (per-bundle release notes)
+    // MARK: - Release Notes (releases[].releaseNotes on a track)
+    //
+    // The Play Developer API has no per-APK or per-bundle listings endpoint
+    // (edits.apks.*.listings / edits.bundles.*.listings do not exist in the v3
+    // discovery document). Release notes are only exposed via edits.tracks:
+    // each release in a track carries a `releaseNotes` array of {language, text}.
 
-    func listBundleListings(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
+    func listReleaseNotes(packageName: String, track: String, versionCode: Int) async throws -> [[String: Any]] {
         let token = try await accessToken()
         let editID = try await createEdit(packageName: packageName, token: token)
 
-        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/bundles/\(versionCode)/listings")!
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(track)")!
         var req = URLRequest(url: url)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
         try await abandonEdit(packageName: packageName, editID: editID, token: token)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw LaunchpadError.invalidResponse
-        }
-        return json["listings"] as? [[String: Any]] ?? []
-    }
-
-    // MARK: - APK Listings (per-version release notes)
-
-    func listApkListings(packageName: String, versionCode: Int) async throws -> [[String: Any]] {
-        let token = try await accessToken()
-        let editID = try await createEdit(packageName: packageName, token: token)
-
-        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/listings")!
-        var req = URLRequest(url: url)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: req)
-        try await abandonEdit(packageName: packageName, editID: editID, token: token)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw LaunchpadError.invalidResponse
-        }
-        return json["listings"] as? [[String: Any]] ?? []
-    }
-
-    func updateApkListing(packageName: String, versionCode: Int, language: String, recentChanges: String) async throws {
-        let token = try await accessToken()
-        let editID = try await createEdit(packageName: packageName, token: token)
-
-        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/apks/\(versionCode)/listings/\(language)")!
-        var req = URLRequest(url: url)
-        req.httpMethod = "PUT"
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["language": language, "recentChanges": recentChanges])
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        if let http = resp as? HTTPURLResponse, http.statusCode >= 400 {
-            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
             throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let releases = json["releases"] as? [[String: Any]]
+        else { throw LaunchpadError.invalidResponse }
+
+        guard let release = releases.first(where: { release in
+            let codes = (release["versionCodes"] as? [String] ?? []).compactMap { Int($0) }
+            return codes.contains(versionCode)
+        }) else {
+            throw LaunchpadError.versionNotFound("version code \(versionCode) on track '\(track)'")
+        }
+        return release["releaseNotes"] as? [[String: Any]] ?? []
+    }
+
+    func updateReleaseNotes(packageName: String, track: String, versionCode: Int, language: String, recentChanges: String) async throws {
+        let token = try await accessToken()
+        let editID = try await createEdit(packageName: packageName, token: token)
+
+        let url = URL(string: "\(baseURL)/applications/\(packageName)/edits/\(editID)/tracks/\(track)")!
+        var getReq = URLRequest(url: url)
+        getReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (getData, getResponse) = try await URLSession.shared.data(for: getReq)
+        if let http = getResponse as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: getData, encoding: .utf8) ?? "")
+        }
+        guard
+            var json = try JSONSerialization.jsonObject(with: getData) as? [String: Any],
+            var releases = json["releases"] as? [[String: Any]]
+        else {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.invalidResponse
+        }
+
+        guard let releaseIndex = releases.firstIndex(where: { release in
+            let codes = (release["versionCodes"] as? [String] ?? []).compactMap { Int($0) }
+            return codes.contains(versionCode)
+        }) else {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.versionNotFound("version code \(versionCode) on track '\(track)'")
+        }
+
+        var releaseNotes = releases[releaseIndex]["releaseNotes"] as? [[String: Any]] ?? []
+        if let existingIndex = releaseNotes.firstIndex(where: { $0["language"] as? String == language }) {
+            releaseNotes[existingIndex]["text"] = recentChanges
+        } else {
+            releaseNotes.append(["language": language, "text": recentChanges])
+        }
+        releases[releaseIndex]["releaseNotes"] = releaseNotes
+        json["releases"] = releases
+
+        var putReq = URLRequest(url: url)
+        putReq.httpMethod = "PUT"
+        putReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        putReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        putReq.httpBody = try JSONSerialization.data(withJSONObject: json)
+        let (putData, putResponse) = try await URLSession.shared.data(for: putReq)
+        if let http = putResponse as? HTTPURLResponse, http.statusCode >= 400 {
+            try await abandonEdit(packageName: packageName, editID: editID, token: token)
+            throw LaunchpadError.apiError(http.statusCode, String(data: putData, encoding: .utf8) ?? "")
         }
         try await commitEdit(packageName: packageName, editID: editID, token: token)
     }
@@ -1532,7 +1550,10 @@ struct GooglePlayClient {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        _ = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            throw LaunchpadError.apiError(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
     }
 
     // MARK: - RS256 signing using openssl (CryptoKit doesn't support RSA)
