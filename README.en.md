@@ -344,6 +344,22 @@ fastlane/
         └── ...
 ```
 
+## Development (pre-commit checks)
+
+This repository has no GitHub Actions CI jobs. Building and linting are macOS-only
+(the code depends on `CryptoKit`, `xcodebuild`, and `altool`), so they cannot run on
+Linux runners, and macOS runners are billed at a much higher rate — so all checks are
+run locally instead.
+
+Always run both of these before committing:
+
+```bash
+swift build              # must build
+swiftlint lint --strict  # must lint clean (warnings are errors)
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 ## License
 
 MIT
