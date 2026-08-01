@@ -24,6 +24,16 @@ swift package clean
 
 There are no automated tests in this project.
 
+There is no GitHub Actions CI either — the build/lint gate is local only, because the
+package is macOS-only and macOS runners are expensive. Before committing, run both:
+
+```bash
+swift build
+swiftlint lint --strict
+```
+
+See `CONTRIBUTING.md` for details.
+
 ## Command Structure
 
 The CLI is built with [swift-argument-parser](https://github.com/apple/swift-argument-parser) and follows this hierarchy:

@@ -559,6 +559,21 @@ fastlane/
         └── ...
 ```
 
+## 開発（コミット前チェック）
+
+このリポジトリには GitHub Actions の CI ジョブはありません。macOS 専用（`CryptoKit` /
+`xcodebuild` / `altool` 依存）でビルド・Lint が Linux ランナーでは動かせず、macOS
+ランナーは課金レートが高いため、チェックはローカル実行に統一しています。
+
+コミット前に必ず次の 2 つを実行してください。
+
+```bash
+swift build              # ビルドが通ること
+swiftlint lint --strict  # Lint が通ること（警告も不可）
+```
+
+詳細は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+
 ## ライセンス
 
 MIT
