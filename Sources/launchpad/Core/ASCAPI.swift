@@ -1612,10 +1612,33 @@ struct ASCAPIClient {
 
     // MARK: - App Categories
 
-    func getAppInfo(appID: String) async throws -> [String: Any] {
-        let data = try await get("/apps/\(appID)/appInfos?include=primaryCategory,secondaryCategory,ageRatingDeclaration&limit=1")
+    /// App Store states in which an appInfo is already published and therefore frozen.
+    /// PATCHing one of these returns 409 ENTITY_ERROR.RELATIONSHIP.INVALID_STATE.
+    private static let publishedAppInfoStates: Set<String> = [
+        "READY_FOR_SALE",
+        "REMOVED_FROM_SALE",
+        "DEVELOPER_REMOVED_FROM_SALE",
+        "REPLACED_WITH_NEW_VERSION",
+    ]
+
+    func getAppInfos(appID: String) async throws -> [[String: Any]] {
+        let data = try await get("/apps/\(appID)/appInfos?include=primaryCategory,secondaryCategory,ageRatingDeclaration&limit=10")
         guard let infos = data["data"] as? [[String: Any]] else { throw LaunchpadError.invalidResponse }
-        return infos.first ?? [:]
+        return infos
+    }
+
+    /// The appInfo that can be edited.
+    ///
+    /// An app that is already on sale keeps two appInfos: the published one and the one for
+    /// the version in progress. The API returns the published one first, so taking `first`
+    /// makes every write fail with 409. Prefer the unpublished one.
+    func getAppInfo(appID: String) async throws -> [String: Any] {
+        let infos = try await getAppInfos(appID: appID)
+        let editable = infos.first { info in
+            let state = (info["attributes"] as? [String: Any])?["appStoreState"] as? String
+            return state.map { !Self.publishedAppInfoStates.contains($0) } ?? false
+        }
+        return editable ?? infos.first ?? [:]
     }
 
     func getAgeRatingDeclarationIDFromAppInfo(appID: String) async throws -> String? {

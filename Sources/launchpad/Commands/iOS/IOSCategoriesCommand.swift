@@ -24,21 +24,24 @@ struct IOSCategoriesGetCommand: AsyncParsableCommand {
         let client = ASCAPIClient(credentials: try ASCCredentials.fromEnvironment())
         Logger.step("Fetching app info for \(bid)")
         let appID = try await client.findApp(bundleID: bid)
-        let appInfo = try await client.getAppInfo(appID: appID)
+        let appInfos = try await client.getAppInfos(appID: appID)
+        if appInfos.isEmpty { Logger.info("No app info found"); return }
 
-        guard let attrs = appInfo["attributes"] as? [String: Any] else {
-            Logger.info("No app info found"); return
-        }
+        // An app already on sale has two: the published one and the editable one.
+        let editableID = (try await client.getAppInfo(appID: appID))["id"] as? String
+        for appInfo in appInfos {
+            guard let attrs = appInfo["attributes"] as? [String: Any] else { continue }
+            let state = attrs["appStoreState"] as? String ?? "-"
+            let mark = (appInfo["id"] as? String) == editableID ? "  <- editable" : ""
+            print("\nApp Store state: \(state)\(mark)")
 
-        let state = attrs["appStoreState"] as? String ?? "-"
-        print("\nApp Store state: \(state)")
-
-        if let rels = appInfo["relationships"] as? [String: Any] {
-            if let primary = (rels["primaryCategory"] as? [String: Any])?["data"] as? [String: Any] {
-                print("Primary category:   \(primary["id"] as? String ?? "-")")
-            }
-            if let secondary = (rels["secondaryCategory"] as? [String: Any])?["data"] as? [String: Any] {
-                print("Secondary category: \(secondary["id"] as? String ?? "-")")
+            if let rels = appInfo["relationships"] as? [String: Any] {
+                if let primary = (rels["primaryCategory"] as? [String: Any])?["data"] as? [String: Any] {
+                    print("Primary category:   \(primary["id"] as? String ?? "-")")
+                }
+                if let secondary = (rels["secondaryCategory"] as? [String: Any])?["data"] as? [String: Any] {
+                    print("Secondary category: \(secondary["id"] as? String ?? "-")")
+                }
             }
         }
     }
