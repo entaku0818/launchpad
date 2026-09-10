@@ -70,7 +70,7 @@ Every command calls `DotEnv.load()` first (reads `.env` in CWD), then `Config.lo
 
 ### iOS API layer
 
-- `ASCAuth.swift` — `ASCCredentials` reads key ID, issuer ID, and PEM key content from env vars, generates ES256 JWT tokens (using CryptoKit `P256`), and writes `.p8` key files for altool compatibility.
+- `ASCAuth.swift` — `ASCCredentials` reads key ID, issuer ID, and PEM key content from env vars, generates ES256 JWT tokens (using CryptoKit `P256`), and writes `.p8` key files for altool compatibility. `normalizePEM` normalizes the key at the entry point, so `\n`-escaped values arriving from the shell (not just from `DotEnv`) still produce a valid PEM.
 - `ASCAPI.swift` — `ASCAPIClient` wraps the App Store Connect REST API v1. All HTTP methods return `[String: Any]` (raw JSONSerialization).
 
 ### Android API layer
@@ -90,7 +90,7 @@ let value = cliOption ?? cfg?.field ?? "default"
 iOS commands require:
 - `APP_STORE_CONNECT_API_KEY_KEY_ID`
 - `APP_STORE_CONNECT_API_KEY_ISSUER_ID`
-- `APP_STORE_CONNECT_API_KEY_CONTENT` (PEM content, `\n` escaped to one line in `.env`)
+- `APP_STORE_CONNECT_API_KEY_CONTENT` (PEM content; either real newlines or `\n` escaped to one line. Normalized by `ASCCredentials.normalizePEM`, so exporting it from a shell works too)
 
 Android commands require:
 - `KEYSTORE_PATH`, `KEYSTORE_STORE_PASSWORD`, `KEYSTORE_KEY_ALIAS`, `KEYSTORE_KEY_PASSWORD` (for `android build --release`)
